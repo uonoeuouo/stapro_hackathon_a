@@ -1,0 +1,178 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/attendance/status": {
+      "post": {
+        "operationId": "AttendanceController_checkStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Employee found"
+          },
+          "404": {
+            "description": "Unknown card"
+          }
+        },
+        "summary": "Check card status and get employee info",
+        "tags": [
+          "attendance"
+        ]
+      }
+    },
+    "/attendance/clock-in": {
+      "post": {
+        "operationId": "AttendanceController_clockIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClockInDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Clock in",
+        "tags": [
+          "attendance"
+        ]
+      }
+    },
+    "/attendance/clock-out": {
+      "post": {
+        "operationId": "AttendanceController_clockOut",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClockOutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Clock out",
+        "tags": [
+          "attendance"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Attendance API",
+    "description": "API for iPad Attendance App",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "CheckStatusDto": {
+        "type": "object",
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "example": "0123456789ABCDEF"
+          },
+          "terminal_id": {
+            "type": "string",
+            "example": "iPad-01"
+          },
+          "client_timestamp": {
+            "type": "string",
+            "example": "2023-10-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "card_id",
+          "terminal_id",
+          "client_timestamp"
+        ]
+      },
+      "ClockInDto": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "number",
+            "example": 1
+          },
+          "terminal_id": {
+            "type": "string",
+            "example": "iPad-01"
+          },
+          "client_timestamp": {
+            "type": "string",
+            "example": "2023-10-27T09:00:00Z"
+          }
+        },
+        "required": [
+          "employee_id",
+          "terminal_id",
+          "client_timestamp"
+        ]
+      },
+      "ClockOutDto": {
+        "type": "object",
+        "properties": {
+          "attendance_id": {
+            "type": "number",
+            "example": 1
+          },
+          "commute_info": {
+            "type": "object",
+            "example": {
+              "template_id": 1,
+              "cost": 500
+            }
+          },
+          "client_timestamp": {
+            "type": "string",
+            "example": "2023-10-27T18:00:00Z"
+          }
+        },
+        "required": [
+          "attendance_id",
+          "commute_info",
+          "client_timestamp"
+        ]
+      }
+    }
+  }
+}

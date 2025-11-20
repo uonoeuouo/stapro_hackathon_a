@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id        Int      @id @default(autoincrement())
+  name      String
+  card_id   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attendances      Attendance[]
+  commuteTemplates CommuteTemplate[]
+}
+
+model Attendance {
+  id             Int      @id @default(autoincrement())
+  employee_id    Int
+  date           DateTime
+  clock_in_time  DateTime
+  clock_out_time DateTime?
+  commute_info   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+}
+
+model CommuteTemplate {
+  id                Int      @id @default(autoincrement())
+  employee_id       Int
+  name              String
+  cost              Int
+  route_description String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+}
