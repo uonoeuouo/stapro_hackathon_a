@@ -36,7 +36,7 @@ class ScanRequest(BaseModel):
 # --- エンドポイント ---
 @app.get("/")
 def read_root():
-    return {"message": "Backend is running!"}
+    return {"message": "Backend is running!testtest"}
 
 @app.post("/api/scan")
 def scan_card(req: ScanRequest):
