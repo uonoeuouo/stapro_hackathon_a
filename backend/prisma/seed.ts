@@ -5,26 +5,67 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('Seeding database...');
 
-    // Create Employees
-    const employee1 = await prisma.employee.upsert({
-        where: { card_id: '12345678' },
-        update: {},
-        create: {
+    // Create Employees (without card_id)
+    const employee1 = await prisma.employee.create({
+        data: {
             name: 'Taro Yamada',
-            card_id: '12345678',
         },
     });
 
-    const employee2 = await prisma.employee.upsert({
-        where: { card_id: '87654321' },
-        update: {},
-        create: {
+    const employee2 = await prisma.employee.create({
+        data: {
             name: 'Hanako Suzuki',
-            card_id: '87654321',
         },
     });
 
-    console.log({ employee1, employee2 });
+    const employee3 = await prisma.employee.create({
+        data: {
+            name: 'Ichiro Tanaka',
+        },
+    });
+
+    console.log({ employee1, employee2, employee3 });
+
+    // Create Cards for employees
+    await prisma.card.createMany({
+        data: [
+            // Employee 1 - Multiple cards
+            {
+                employee_id: employee1.id,
+                card_id: '12345678',
+                name: 'Main Card',
+                is_active: true,
+            },
+            {
+                employee_id: employee1.id,
+                card_id: '12345679',
+                name: 'Backup Card',
+                is_active: true,
+            },
+            // Employee 2 - Single card
+            {
+                employee_id: employee2.id,
+                card_id: '87654321',
+                name: 'Main Card',
+                is_active: true,
+            },
+            // Employee 3 - Multiple cards with one inactive
+            {
+                employee_id: employee3.id,
+                card_id: 'CARD001',
+                name: 'Old Card',
+                is_active: false,
+            },
+            {
+                employee_id: employee3.id,
+                card_id: 'CARD002',
+                name: 'Current Card',
+                is_active: true,
+            },
+        ],
+    });
+
+    console.log('Cards created.');
 
     // Create Commute Templates for Employee 1
     await prisma.commuteTemplate.createMany({
@@ -50,6 +91,17 @@ async function main() {
                 employee_id: employee2.id,
                 name: 'Subway',
                 cost: 180,
+            },
+        ],
+    });
+
+    // Create Commute Templates for Employee 3
+    await prisma.commuteTemplate.createMany({
+        data: [
+            {
+                employee_id: employee3.id,
+                name: 'Train',
+                cost: 300,
             },
         ],
     });

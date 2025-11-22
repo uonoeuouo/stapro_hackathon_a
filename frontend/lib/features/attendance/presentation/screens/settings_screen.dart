@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:openapi/api.dart';
 import '../../../../theme/app_theme.dart';
 import '../../data/providers.dart';
@@ -263,6 +264,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: const Text('交通費設定'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (employee != null)
+            IconButton(
+              icon: const Icon(Icons.credit_card),
+              tooltip: 'カード管理',
+              onPressed: () {
+                context.go(
+                  '/card-management',
+                  extra: {
+                    'employeeId': employee['id'],
+                    'employeeName': employee['name'],
+                  },
+                );
+              },
+            ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),

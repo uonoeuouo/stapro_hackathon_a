@@ -8,14 +8,25 @@ export class AttendanceService {
   constructor(private prisma: PrismaService) { }
 
   async checkStatus(dto: CheckStatusDto) {
-    const employee = await this.prisma.employee.findUnique({
+    // Find card and employee through Card table
+    const card = await this.prisma.card.findUnique({
       where: { card_id: dto.card_id },
-      include: { commuteTemplates: true },
+      include: {
+        employee: {
+          include: { commuteTemplates: true },
+        },
+      },
     });
 
-    if (!employee) {
+    if (!card) {
       throw new NotFoundException('unknown_card');
     }
+
+    if (!card.is_active) {
+      throw new BadRequestException('card_inactive');
+    }
+
+    const employee = card.employee;
 
     // Check for today's attendance
     const today = new Date();

@@ -40,8 +40,14 @@ dependencies:
   intl: ^0.19.0
   google_fonts: ^6.3.2
   flutter_animate: ^4.5.0
+  js: ^0.6.7
   openapi:
     path: ../frontend_client
+  flutter_pcsc: ^0.0.4
+
+dependency_overrides:
+  flutter_pcsc_macos:
+    path: local_packages/flutter_pcsc_macos
 
 dev_dependencies:
   flutter_test:

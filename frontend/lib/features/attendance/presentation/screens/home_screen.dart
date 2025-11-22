@@ -1,7 +1,9 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../theme/app_theme.dart';
+import '../widgets/nfc_reader_widget.dart';
 import '../widgets/mock_nfc_reader.dart';
 
 import 'dart:async';
@@ -55,6 +57,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.manage_accounts, color: Colors.white),
+            tooltip: 'カード管理',
+            onPressed: () => context.push('/employee-selection'),
+          ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: AppTheme.backgroundGradient),
@@ -63,51 +72,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  margin: const EdgeInsets.all(24),
-                  padding: const EdgeInsets.all(40),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceColor.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(32),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                            Icons.access_time_filled_rounded,
-                            size: 80,
-                            color: AppTheme.primaryColor.withOpacity(0.8),
-                          )
-                          .animate(onPlay: (controller) => controller.repeat())
-                          .shimmer(
-                            duration: 2000.ms,
-                            color: AppTheme.secondaryColor,
-                          )
-                          .animate() // separate animation for entrance
-                          .fadeIn(duration: 600.ms)
-                          .scale(delay: 200.ms),
-                      const SizedBox(height: 24),
-                      Text(
-                            'カードをかざしてください',
-                            style: Theme.of(context).textTheme.displayMedium,
-                          )
-                          .animate()
-                          .fadeIn(delay: 400.ms)
-                          .slideY(begin: 0.2, end: 0),
-                      const SizedBox(height: 40),
-                      const MockNfcReader()
-                          .animate()
-                          .fadeIn(delay: 600.ms)
-                          .slideY(begin: 0.2, end: 0),
-                    ],
-                  ),
+                Column(
+                  children: [
+                    const NfcReaderWidget()
+                        .animate()
+                        .fadeIn(delay: 600.ms)
+                        .slideY(begin: 0.2, end: 0),
+                  ],
                 ),
               ],
             ),

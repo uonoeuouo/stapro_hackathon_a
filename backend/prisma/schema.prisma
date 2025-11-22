@@ -10,12 +10,27 @@ datasource db {
 model Employee {
   id        Int      @id @default(autoincrement())
   name      String
-  card_id   String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  cards            Card[]
   attendances      Attendance[]
   commuteTemplates CommuteTemplate[]
+}
+
+model Card {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  card_id     String   @unique
+  name        String?
+  is_active   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@index([card_id])
 }
 
 model Attendance {
