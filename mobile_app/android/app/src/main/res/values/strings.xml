@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">mobile_app</string>
+    <string name="servicedesc">Stapro Hackathon Attendance Service</string>
+    <string name="aiddescription">Stapro Hackathon Attendance AID</string>
+</resources>
