@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../theme/app_theme.dart';
 import '../widgets/nfc_reader_widget.dart';
 import '../widgets/mock_nfc_reader.dart';
+import '../../data/providers.dart';
 
 import 'dart:async';
 import 'package:intl/intl.dart';
@@ -43,6 +44,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final schoolName = ref.watch(selectedSchoolNameProvider);
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -57,6 +60,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: schoolName != null
+            ? IconButton(
+                icon: const Icon(Icons.school),
+                tooltip: schoolName,
+                onPressed: () => context.go('/classroom-selection'),
+              )
+            : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.manage_accounts, color: Colors.white),

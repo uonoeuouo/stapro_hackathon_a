@@ -7,9 +7,25 @@ import { CardService } from './card.service';
 import { CardController } from './card.controller';
 import { EmployeeService } from './employee.service';
 import { EmployeeController } from './employee.controller';
+import { ExternalSystemModule } from '../external-system/external-system.module';
+import { CardsController } from './cards.controller';
+import { SchoolsController } from './schools.controller';
 
 @Module({
-  controllers: [AttendanceController, CommuteTemplateController, CardController, EmployeeController],
-  providers: [AttendanceService, CommuteTemplateService, CardService, EmployeeService],
+  imports: [ExternalSystemModule],
+  controllers: [
+    AttendanceController,
+    CommuteTemplateController,
+    CardController,
+    EmployeeController,
+    CardsController,
+    SchoolsController,
+  ],
+  providers: [
+    AttendanceService,
+    CommuteTemplateService,
+    CardService,
+    EmployeeService,
+  ],
 })
 export class AttendanceModule { }

@@ -22,6 +22,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
   ClockOutStep _currentStep = ClockOutStep.selection;
   dynamic _selectedTemplate;
   final _costController = TextEditingController();
+  final _lessonCountController = TextEditingController(text: '0');
   Timer? _timer;
   int _countdown = 10;
 
@@ -35,6 +36,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
   void dispose() {
     _timer?.cancel();
     _costController.dispose();
+    _lessonCountController.dispose();
     super.dispose();
   }
 
@@ -81,9 +83,9 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
       final dto = ClockOutDto(
         attendanceId: attendance['id'],
         commuteInfo: commuteInfo,
+        totalLesson: int.tryParse(_lessonCountController.text) ?? 0,
         clientTimestamp: DateTime.now().toIso8601String(),
       );
-
       await api.attendanceControllerClockOut(dto);
 
       if (mounted) {
@@ -649,6 +651,32 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
           ),
           child: Column(
             children: [
+              // Lesson Count Input
+              TextField(
+                controller: _lessonCountController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'コマ数',
+                  labelStyle: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textSecondary,
+                  ),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
               Text(
                 templateName,
                 style: const TextStyle(

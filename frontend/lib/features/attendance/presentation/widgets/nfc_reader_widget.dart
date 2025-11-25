@@ -363,6 +363,17 @@ class _NfcReaderWidgetState extends ConsumerState<NfcReaderWidget> {
       }
     } catch (e) {
       _log('API Error: $e');
+
+      // Check if this is an unknown card error (404)
+      if (e is ApiException && e.code == 404) {
+        _log('Unknown card detected, navigating to login');
+        if (mounted) {
+          ref.read(statusMessageProvider.notifier).state = null;
+          context.go('/login/$cardId');
+        }
+        return;
+      }
+
       ref.read(statusMessageProvider.notifier).state = 'エラー: $e';
       // Clear error after 3 seconds
       Future.delayed(const Duration(seconds: 3), () {
@@ -518,15 +529,79 @@ class _NfcReaderWidgetState extends ConsumerState<NfcReaderWidget> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 32),
-        ElevatedButton(
-          onPressed: _initializeReader,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          ),
-          child: const Text('再試行', style: TextStyle(fontSize: 18)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _initializeReader,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('再試行', style: TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton.icon(
+              onPressed: _showManualInputDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+              ),
+              icon: const Icon(Icons.keyboard),
+              label: const Text('手入力', style: TextStyle(fontSize: 18)),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  void _showManualInputDialog() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('カードID手入力'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'カードID',
+            hintText: '例: 0123456789ABCDEF',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) {
+            if (value.isNotEmpty) {
+              Navigator.pop(context);
+              _handleCardDetected(value);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final cardId = controller.text.trim();
+              if (cardId.isNotEmpty) {
+                Navigator.pop(context);
+                _handleCardDetected(cardId);
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -54,6 +54,9 @@ class _ClockInScreenState extends ConsumerState<ClockInScreen> {
     final employee = ref.read(currentEmployeeProvider);
     if (employee == null) return;
 
+    // Get selected school ID, default to 1 if not set
+    final schoolId = ref.read(selectedSchoolIdProvider) ?? 1;
+
     setState(() => _isLoading = true);
 
     try {
@@ -61,6 +64,7 @@ class _ClockInScreenState extends ConsumerState<ClockInScreen> {
       final dto = ClockInDto(
         employeeId: employee['id'],
         terminalId: 'iPad-01',
+        schoolId: schoolId,
         clientTimestamp: DateTime.now().toIso8601String(),
       );
 

@@ -1,11 +1,33 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openapi/api.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'nfc_reader_interface.dart';
 import 'mock_nfc_reader_impl.dart';
 // Conditional import: use web_serial on web, stub on other platforms
 import 'web_serial_nfc_reader.dart' if (dart.library.io) 'web_serial_stub.dart';
 import 'pcsc_nfc_reader_stub.dart' if (dart.library.io) 'pcsc_nfc_reader.dart';
+
+// SharedPreferences Provider
+final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
+  ref,
+) async {
+  return await SharedPreferences.getInstance();
+});
+
+// Initialize classroom from SharedPreferences
+final initializeClassroomProvider = FutureProvider<void>((ref) async {
+  final prefs = await ref.watch(sharedPreferencesProvider.future);
+  final schoolId = prefs.getInt('selected_school_id');
+  final schoolName = prefs.getString('selected_school_name');
+
+  if (schoolId != null) {
+    ref.read(selectedSchoolIdProvider.notifier).state = schoolId;
+  }
+  if (schoolName != null) {
+    ref.read(selectedSchoolNameProvider.notifier).state = schoolName;
+  }
+});
 
 // API Client Provider
 final apiClientProvider = Provider<ApiClient>((ref) {
@@ -27,6 +49,10 @@ final cardsApiProvider = Provider<CardsApi>((ref) {
 
 final employeesApiProvider = Provider<EmployeesApi>((ref) {
   return EmployeesApi(ref.watch(apiClientProvider));
+});
+
+final schoolsApiProvider = Provider<SchoolsApi>((ref) {
+  return SchoolsApi(ref.watch(apiClientProvider));
 });
 
 // NFC Reader Provider - chooses implementation based on platform
@@ -56,6 +82,10 @@ final currentCardIdProvider = StateProvider<String?>((ref) => null);
 final currentEmployeeProvider = StateProvider<dynamic>((ref) => null);
 final currentAttendanceProvider = StateProvider<dynamic>((ref) => null);
 final commuteTemplatesProvider = StateProvider<List<dynamic>>((ref) => []);
+
+// State for selected classroom
+final selectedSchoolIdProvider = StateProvider<int?>((ref) => null);
+final selectedSchoolNameProvider = StateProvider<String?>((ref) => null);
 
 // State for UI status (loading, error, success)
 // State for UI status (loading, error, success)

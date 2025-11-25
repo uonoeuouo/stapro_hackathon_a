@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CheckStatusDto, ClockInDto, ClockOutDto } from './dto/attendance-operations.dto';
 import { Prisma } from '@prisma/client';
+import { ExternalSystemService } from '../external-system/external-system.service';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private externalSystem: ExternalSystemService,
+  ) { }
 
   async checkStatus(dto: CheckStatusDto) {
     // Find card and employee through Card table
@@ -72,6 +76,7 @@ export class AttendanceService {
         employee_id: dto.employee_id,
         date: today,
         clock_in_time: new Date(dto.client_timestamp),
+        school_id: dto.school_id,
       },
     });
 
@@ -81,6 +86,7 @@ export class AttendanceService {
   async clockOut(dto: ClockOutDto) {
     const attendance = await this.prisma.attendance.findUnique({
       where: { id: dto.attendance_id },
+      include: { employee: true },
     });
 
     if (!attendance) {
@@ -91,11 +97,41 @@ export class AttendanceService {
       throw new BadRequestException('already_clocked_out');
     }
 
+    let externalAttendanceId: number | null = null;
+
+    // Sync with external system if employee is linked
+    if (attendance.employee.external_staff_id && attendance.school_id) {
+      try {
+        const externalAttendance =
+          await this.externalSystem.registerAttendance({
+            attendance: {
+              staff_id: attendance.employee.external_staff_id,
+              work_day: attendance.date.toISOString().split('T')[0],
+              school_id: attendance.school_id,
+              commuting_costs: dto.commute_info?.cost || 0,
+              another_time: 0, // Default
+              total_lesson: dto.total_lesson || 0,
+              total_training_lesson: 0, // Default
+              deduction_time: 0, // Default
+              note: dto.commute_info?.name || '',
+            },
+            lesson_ids: [], // We don't track specific lessons yet
+            total_training_lesson: 0,
+          });
+        externalAttendanceId = externalAttendance.id;
+      } catch (e) {
+        console.error('Failed to sync with external system', e);
+        // We continue even if sync fails, but maybe we should flag it?
+        // For now, we just log it.
+      }
+    }
+
     const updated = await this.prisma.attendance.update({
       where: { id: dto.attendance_id },
       data: {
         clock_out_time: new Date(dto.client_timestamp),
         commute_info: dto.commute_info || {},
+        external_attendance_id: externalAttendanceId,
       },
     });
 
@@ -113,11 +149,23 @@ export class AttendanceService {
 
     // If clocked out, revert to clocked in
     if (attendance.clock_out_time) {
+      // If synced, delete from external system
+      if (attendance.external_attendance_id) {
+        try {
+          await this.externalSystem.deleteAttendance(
+            attendance.external_attendance_id,
+          );
+        } catch (e) {
+          console.error('Failed to delete from external system', e);
+        }
+      }
+
       const updated = await this.prisma.attendance.update({
         where: { id },
         data: {
           clock_out_time: null,
-          commute_info: Prisma.DbNull,
+          commute_info: null as any,
+          external_attendance_id: null,
         },
       });
       return { type: 'cancel_clock_out', attendance: updated };

@@ -24,6 +24,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _fetchTemplates();
+    _fetchSchools();
+  }
+
+  Future<void> _fetchSchools() async {
+    try {
+      final api = ref.read(schoolsApiProvider);
+      final response = await api.schoolsControllerGetSchoolsWithHttpInfo();
+
+      if (response.statusCode >= 400) {
+        throw ApiException(response.statusCode, response.body);
+      }
+
+      final data = jsonDecode(response.body);
+      // Schools are returned in the response, we'll store them locally
+      setState(() {
+        // Store schools in a local variable if needed
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('教室の取得に失敗しました: $e')));
+      }
+    }
   }
 
   Future<void> _fetchTemplates() async {

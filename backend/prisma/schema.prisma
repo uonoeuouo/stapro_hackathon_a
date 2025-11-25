@@ -8,10 +8,11 @@ datasource db {
 }
 
 model Employee {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                Int      @id @default(autoincrement())
+  name              String
+  external_staff_id Int?     @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   cards            Card[]
   attendances      Attendance[]
@@ -34,14 +35,16 @@ model Card {
 }
 
 model Attendance {
-  id             Int      @id @default(autoincrement())
-  employee_id    Int
-  date           DateTime
-  clock_in_time  DateTime
-  clock_out_time DateTime?
-  commute_info   Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                     Int      @id @default(autoincrement())
+  employee_id            Int
+  date                   DateTime
+  clock_in_time          DateTime
+  clock_out_time         DateTime?
+  commute_info           Json?
+  external_attendance_id Int?     @unique
+  school_id              Int?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   employee Employee @relation(fields: [employee_id], references: [id])
 }

@@ -44,6 +44,7 @@ dependencies:
   openapi:
     path: ../frontend_client
   flutter_pcsc: ^0.0.4
+  shared_preferences: ^2.5.3
 
 dependency_overrides:
   flutter_pcsc_macos:
