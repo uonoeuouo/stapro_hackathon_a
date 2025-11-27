@@ -9,6 +9,13 @@ export class SchoolDto {
     closed_on: string | null;
     created_at: string;
     updated_at: string;
+    timetables: {
+        day_of_week: number;
+        day_name: string;
+        lesson_id: number;
+        start_time: string;
+        end_time: string;
+    }[];
 }
 
 export class ExternalStaffDto {

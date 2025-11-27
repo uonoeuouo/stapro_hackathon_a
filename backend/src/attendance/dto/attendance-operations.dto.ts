@@ -55,6 +55,15 @@ export class ClockOutDto {
     @IsOptional()
     total_lesson?: number;
 
+    @ApiProperty({ example: [1, 2] })
+    @IsOptional()
+    lesson_ids?: number[];
+
+    @ApiProperty({ example: 1.5 })
+    @IsNumber()
+    @IsOptional()
+    another_time?: number;
+
     @ApiProperty({ example: '2023-10-27T18:00:00Z' })
     @IsString()
     @IsNotEmpty()

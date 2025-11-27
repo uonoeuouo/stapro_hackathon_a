@@ -111,7 +111,22 @@ class _ClockInScreenState extends ConsumerState<ClockInScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.credit_card),
+            tooltip: 'カード管理',
+            onPressed: () {
+              _cancelTimer();
+              context.push(
+                '/card-management',
+                extra: {
+                  'employeeId': employee['id'],
+                  'employeeName': employee['name'],
+                },
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.train),
+            tooltip: '交通費設定',
             onPressed: () {
               _cancelTimer();
               context.push('/settings');
@@ -128,94 +143,96 @@ class _ClockInScreenState extends ConsumerState<ClockInScreen> {
               flex: 1,
               child: Container(
                 padding: const EdgeInsets.all(40),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundColor: AppTheme.surfaceColor,
-                        child: Icon(
-                          Icons.person,
-                          size: 40,
-                          color: AppTheme.primaryColor.withOpacity(0.5),
-                        ),
-                      ),
-                    ).animate().scale(
-                      duration: 600.ms,
-                      curve: Curves.easeOutBack,
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                          'おはようございます',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: AppTheme.textSecondary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        )
-                        .animate()
-                        .fadeIn(delay: 200.ms)
-                        .slideX(begin: -0.2, end: 0),
-                    const SizedBox(height: 16),
-                    Text(
-                          '${employee?['name']}さん',
-                          style: Theme.of(context).textTheme.displayMedium
-                              ?.copyWith(
-                                color: AppTheme.textPrimary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        )
-                        .animate()
-                        .fadeIn(delay: 400.ms)
-                        .slideX(begin: -0.2, end: 0),
-                    const SizedBox(height: 40),
-                    if (_countdown > 0)
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: AppTheme.primaryColor.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.timer,
-                              color: AppTheme.primaryColor,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'あと$_countdown秒で自動的に出勤します',
-                              style: const TextStyle(
-                                color: AppTheme.primaryColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 20,
+                              spreadRadius: 5,
                             ),
                           ],
                         ),
-                      ).animate().fadeIn(),
-                  ],
+                        child: CircleAvatar(
+                          radius: 40,
+                          backgroundColor: AppTheme.surfaceColor,
+                          child: Icon(
+                            Icons.person,
+                            size: 40,
+                            color: AppTheme.primaryColor.withOpacity(0.5),
+                          ),
+                        ),
+                      ).animate().scale(
+                        duration: 600.ms,
+                        curve: Curves.easeOutBack,
+                      ),
+                      const SizedBox(height: 32),
+                      Text(
+                            'おはようございます',
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          )
+                          .animate()
+                          .fadeIn(delay: 200.ms)
+                          .slideX(begin: -0.2, end: 0),
+                      const SizedBox(height: 16),
+                      Text(
+                            '${employee?['name']}さん',
+                            style: Theme.of(context).textTheme.displayMedium
+                                ?.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          )
+                          .animate()
+                          .fadeIn(delay: 400.ms)
+                          .slideX(begin: -0.2, end: 0),
+                      const SizedBox(height: 40),
+                      if (_countdown > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(
+                              color: AppTheme.primaryColor.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.timer,
+                                color: AppTheme.primaryColor,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'あと$_countdown秒で自動的に出勤します',
+                                style: const TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ).animate().fadeIn(),
+                    ],
+                  ),
                 ),
               ),
             ),

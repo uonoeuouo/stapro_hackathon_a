@@ -344,7 +344,14 @@ class _NfcReaderWidgetState extends ConsumerState<NfcReaderWidget> {
       // Store employee and attendance info
       ref.read(currentCardIdProvider.notifier).state = cardId;
       ref.read(currentEmployeeProvider.notifier).state = data['employee'];
-      ref.read(currentAttendanceProvider.notifier).state = data['attendance'];
+
+      // Merge school data into attendance
+      final attendance = data['attendance'];
+      if (attendance != null && data['school'] != null) {
+        attendance['school'] = data['school'];
+      }
+      ref.read(currentAttendanceProvider.notifier).state = attendance;
+
       ref.read(commuteTemplatesProvider.notifier).state =
           (data['commute_templates'] as List<dynamic>?) ?? [];
 

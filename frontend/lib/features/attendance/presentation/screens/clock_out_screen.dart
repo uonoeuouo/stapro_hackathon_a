@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:intl/intl.dart';
 import 'package:openapi/api.dart';
 import '../../../../theme/app_theme.dart';
 import '../../data/providers.dart';
 
-enum ClockOutStep { selection, input, confirmation }
+enum ClockOutStep { selection, lessons, confirmation }
 
 class ClockOutScreen extends ConsumerStatefulWidget {
   const ClockOutScreen({super.key});
@@ -22,21 +22,148 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
   ClockOutStep _currentStep = ClockOutStep.selection;
   dynamic _selectedTemplate;
   final _costController = TextEditingController();
-  final _lessonCountController = TextEditingController(text: '0');
+  final _overtimeController = TextEditingController(text: '0');
+  List<int> _selectedLessonIds = [];
+  Map<String, dynamic>? _school;
   Timer? _timer;
   int _countdown = 10;
 
   @override
   void initState() {
     super.initState();
-    // Timer is not started initially
+    // Initialize school data and auto-select lessons
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final attendance = ref.read(currentAttendanceProvider);
+      if (attendance != null && mounted) {
+        setState(() {
+          _school = attendance['school'];
+        });
+        _autoSelectLessons();
+        // Calculate overtime after auto-selection
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _calculateAndSetOvertime();
+          }
+        });
+      }
+    });
+  }
+
+  void _calculateAndSetOvertime() {
+    final attendance = ref.read(currentAttendanceProvider);
+    if (_selectedLessonIds.isEmpty || attendance == null) {
+      _overtimeController.text = '0';
+      return;
+    }
+
+    final clockInTime = attendance['clock_in_time'] != null
+        ? DateTime.parse(attendance['clock_in_time']).toLocal()
+        : null;
+    if (clockInTime == null) return;
+
+    final dayOfWeek = clockInTime.weekday % 7;
+    final timetables = _school?['timetables'] as List<dynamic>? ?? [];
+    final todayLessons = timetables
+        .where((t) => t['day_of_week'] == dayOfWeek)
+        .toList();
+
+    // Find the latest lesson end time from selected lessons
+    DateTime? latestLessonEnd;
+    for (final lessonId in _selectedLessonIds) {
+      final lesson = todayLessons.firstWhere(
+        (l) => l['lesson_id'] == lessonId,
+        orElse: () => null,
+      );
+      if (lesson != null) {
+        final endParts = (lesson['end_time'] as String).split(':');
+        final lessonEnd = DateTime(
+          clockInTime.year,
+          clockInTime.month,
+          clockInTime.day,
+          int.parse(endParts[0]),
+          int.parse(endParts[1]),
+        );
+        if (latestLessonEnd == null || lessonEnd.isAfter(latestLessonEnd)) {
+          latestLessonEnd = lessonEnd;
+        }
+      }
+    }
+
+    if (latestLessonEnd != null) {
+      final currentTime = DateTime.now();
+      final overtimeMinutes = currentTime.difference(latestLessonEnd).inMinutes;
+      if (mounted) {
+        setState(() {
+          _overtimeController.text = overtimeMinutes > 0
+              ? overtimeMinutes.toString()
+              : '0';
+        });
+      }
+    }
+  }
+
+  void _autoSelectLessons() {
+    if (_school == null) return;
+
+    final attendance = ref.read(currentAttendanceProvider);
+    if (attendance == null || attendance['clock_in_time'] == null) return;
+
+    try {
+      final clockInTime = DateTime.parse(attendance['clock_in_time']).toLocal();
+      final currentTime = DateTime.now();
+      final dayOfWeek = clockInTime.weekday % 7; // Convert to 0=Sunday format
+
+      final timetables = _school!['timetables'] as List<dynamic>? ?? [];
+      final todayLessons = timetables
+          .where((t) => t['day_of_week'] == dayOfWeek)
+          .toList();
+
+      final selectedIds = <int>[];
+      for (final lesson in todayLessons) {
+        // Parse lesson time (HH:MM format)
+        final startParts = (lesson['start_time'] as String).split(':');
+        final endParts = (lesson['end_time'] as String).split(':');
+
+        final lessonStart = DateTime(
+          clockInTime.year,
+          clockInTime.month,
+          clockInTime.day,
+          int.parse(startParts[0]),
+          int.parse(startParts[1]),
+        );
+
+        final lessonEnd = DateTime(
+          clockInTime.year,
+          clockInTime.month,
+          clockInTime.day,
+          int.parse(endParts[0]),
+          int.parse(endParts[1]),
+        );
+
+        // Check if lesson is completely within attendance period
+        // clockInTime < lessonStart AND lessonEnd < currentTime
+        if (clockInTime.isBefore(lessonStart) &&
+            currentTime.isAfter(lessonEnd)) {
+          selectedIds.add(lesson['lesson_id'] as int);
+        }
+      }
+
+      if (mounted && selectedIds.isNotEmpty) {
+        setState(() {
+          _selectedLessonIds = selectedIds;
+        });
+      }
+    } catch (e) {
+      // Ignore errors in auto-selection
+      print('Error in _autoSelectLessons: $e');
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _costController.dispose();
-    _lessonCountController.dispose();
+    _overtimeController.dispose();
     super.dispose();
   }
 
@@ -83,7 +210,11 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
       final dto = ClockOutDto(
         attendanceId: attendance['id'],
         commuteInfo: commuteInfo,
-        totalLesson: int.tryParse(_lessonCountController.text) ?? 0,
+        totalLesson: _selectedLessonIds.length,
+        lessonIds: _selectedLessonIds.map((id) => id.toString()).toList(),
+        anotherTime:
+            (int.tryParse(_overtimeController.text) ?? 0) /
+            60.0, // Convert minutes to hours
         clientTimestamp: DateTime.now().toIso8601String(),
       );
       await api.attendanceControllerClockOut(dto);
@@ -134,7 +265,24 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.credit_card),
+            tooltip: 'カード管理',
+            onPressed: () {
+              _cancelTimer();
+              if (employee != null) {
+                context.push(
+                  '/card-management',
+                  extra: {
+                    'employeeId': employee['id'],
+                    'employeeName': employee['name'],
+                  },
+                );
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.train),
+            tooltip: '交通費設定',
             onPressed: () {
               _cancelTimer();
               context.push('/settings');
@@ -167,27 +315,18 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                         size: 60,
                         color: AppTheme.secondaryColor,
                       ),
-                    ).animate().scale(
-                      duration: 400.ms,
-                      curve: Curves.easeOutBack,
                     ),
                     const SizedBox(height: 24),
                     Text(
-                          'お疲れ様でした',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(color: AppTheme.textSecondary),
-                        )
-                        .animate()
-                        .fadeIn(delay: 200.ms)
-                        .slideY(begin: 0.2, end: 0),
+                      'お疲れ様でした',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: AppTheme.textSecondary),
+                    ),
                     const SizedBox(height: 8),
                     Text(
-                          '${employee?['name']}さん',
-                          style: Theme.of(context).textTheme.displayMedium,
-                        )
-                        .animate()
-                        .fadeIn(delay: 300.ms)
-                        .slideY(begin: 0.2, end: 0),
+                      '${employee?['name']}さん',
+                      style: Theme.of(context).textTheme.displayMedium,
+                    ),
                     const SizedBox(height: 20),
                     const Text(
                       '本日の業務は終了しています。',
@@ -195,7 +334,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
-                    ).animate().fadeIn(delay: 400.ms),
+                    ),
                     const SizedBox(height: 40),
                     ElevatedButton(
                       onPressed: () => context.go('/'),
@@ -204,7 +343,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                         foregroundColor: AppTheme.primaryColor,
                       ),
                       child: const Text('ホームに戻る'),
-                    ).animate().fadeIn(delay: 500.ms),
+                    ),
                     const SizedBox(height: 20),
                     TextButton(
                       onPressed: () async {
@@ -265,187 +404,217 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                         foregroundColor: AppTheme.errorColor,
                       ),
                       child: const Text('退勤を取り消す'),
-                    ).animate().fadeIn(delay: 600.ms),
+                    ),
                   ],
                 ),
               )
-            : Row(
-                children: [
-                  // Left Column: Information
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      padding: const EdgeInsets.all(40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
+            : SizedBox.expand(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Left Column: Information
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(40, 60, 40, 40),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight,
                                 ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 40,
-                              backgroundColor: AppTheme.surfaceColor,
-                              child: Icon(
-                                Icons.person,
-                                size: 40,
-                                color: AppTheme.primaryColor.withOpacity(0.5),
-                              ),
-                            ),
-                          ).animate().scale(
-                            duration: 600.ms,
-                            curve: Curves.easeOutBack,
-                          ),
-                          const SizedBox(height: 32),
-                          if (employee != null)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'お疲れ様でした',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: AppTheme.textSecondary,
-                                        fontWeight: FontWeight.bold,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 4,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.2,
+                                            ),
+                                            blurRadius: 20,
+                                            spreadRadius: 5,
+                                          ),
+                                        ],
                                       ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '${employee['name']}さん',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .displayMedium
-                                      ?.copyWith(
-                                        color: AppTheme.textPrimary,
-                                        fontWeight: FontWeight.bold,
+                                      child: CircleAvatar(
+                                        radius: 40,
+                                        backgroundColor: AppTheme.surfaceColor,
+                                        child: Icon(Icons.person, size: 40),
                                       ),
-                                ),
-                              ],
-                            ).animate().fadeIn().slideX(begin: -0.2, end: 0),
-                          const SizedBox(height: 32),
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildTimeRow(
-                                  context,
-                                  '現在時刻',
-                                  DateTime.now(),
-                                  isLarge: true,
-                                ),
-                                if (attendance != null &&
-                                    attendance['clock_in_time'] != null) ...[
-                                  const Divider(height: 32),
-                                  _buildTimeRow(
-                                    context,
-                                    '出勤時刻',
-                                    DateTime.parse(attendance['clock_in_time']),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ).animate().fadeIn(delay: 200.ms),
-                          const SizedBox(height: 32),
-                          Center(
-                            child: TextButton(
-                              onPressed: () async {
-                                if (attendance == null) return;
-                                try {
-                                  final api = ref.read(attendanceApiProvider);
-                                  await api.attendanceControllerCancel(
-                                    attendance['id'],
-                                  );
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('出勤を取り消しました'),
-                                        backgroundColor:
-                                            AppTheme.secondaryColor,
-                                      ),
-                                    );
-                                    context.go('/');
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('エラー: $e'),
-                                        backgroundColor: AppTheme.errorColor,
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppTheme.errorColor,
-                              ),
-                              child: const Text('出勤を取り消す'),
-                            ),
-                          ).animate().fadeIn(delay: 300.ms),
-                          const SizedBox(height: 24),
-                          if (_currentStep == ClockOutStep.confirmation &&
-                              _countdown > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                  color: AppTheme.primaryColor.withOpacity(0.3),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.timer,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'あと$_countdown秒で自動的に退勤します',
-                                    style: const TextStyle(
-                                      color: AppTheme.primaryColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 32),
+                                    if (employee != null)
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'お疲れ様でした',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .headlineSmall
+                                                ?.copyWith(
+                                                  color: AppTheme.textSecondary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            '${employee['name']}さん',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .displayMedium
+                                                ?.copyWith(
+                                                  color: AppTheme.textPrimary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    const SizedBox(height: 32),
+                                    Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.6),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildTimeRow(
+                                            context,
+                                            '現在時刻',
+                                            DateTime.now(),
+                                            isLarge: true,
+                                          ),
+                                          if (attendance != null &&
+                                              attendance['clock_in_time'] !=
+                                                  null) ...[
+                                            const Divider(height: 32),
+                                            _buildTimeRow(
+                                              context,
+                                              '出勤時刻',
+                                              DateTime.parse(
+                                                attendance['clock_in_time'],
+                                              ).toLocal(),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 32),
+                                    Center(
+                                      child: TextButton(
+                                        onPressed: () async {
+                                          if (attendance == null) return;
+                                          try {
+                                            final api = ref.read(
+                                              attendanceApiProvider,
+                                            );
+                                            await api
+                                                .attendanceControllerCancel(
+                                                  attendance['id'],
+                                                );
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('出勤を取り消しました'),
+                                                  backgroundColor:
+                                                      AppTheme.secondaryColor,
+                                                ),
+                                              );
+                                              context.go('/');
+                                            }
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('エラー: $e'),
+                                                  backgroundColor:
+                                                      AppTheme.errorColor,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppTheme.errorColor,
+                                        ),
+                                        child: const Text('出勤を取り消す'),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    if (_currentStep ==
+                                            ClockOutStep.confirmation &&
+                                        _countdown > 0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryColor
+                                              .withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            30,
+                                          ),
+                                          border: Border.all(
+                                            color: AppTheme.primaryColor
+                                                .withOpacity(0.3),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.timer,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              'あと$_countdown秒で自動的に退勤します',
+                                              style: const TextStyle(
+                                                color: AppTheme.primaryColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ).animate().fadeIn(),
-                        ],
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  // Right Column: 3-Step Flow
-                  Expanded(
-                    flex: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: _buildRightColumn(context),
+                    // Right Column: 3-Step Flow
+                    Expanded(
+                      flex: 1,
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: _buildRightColumn(context),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );
@@ -455,8 +624,8 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
     switch (_currentStep) {
       case ClockOutStep.selection:
         return _buildSelectionStep(context);
-      case ClockOutStep.input:
-        return _buildInputStep(context);
+      case ClockOutStep.lessons:
+        return _buildLessonsStep(context);
       case ClockOutStep.confirmation:
         return _buildConfirmationStep(context);
     }
@@ -484,10 +653,13 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                   onTap: () {
                     setState(() {
                       _selectedTemplate = t;
-                      _costController.text = t['cost'].toString();
-                      _currentStep = ClockOutStep.confirmation;
+                      _costController.text =
+                          (t['cost'] is int
+                                  ? t['cost']
+                                  : (t['cost'] as num).toInt())
+                              .toString();
+                      _currentStep = ClockOutStep.lessons;
                     });
-                    _startAutoConfirmTimer();
                   },
                 ),
               ),
@@ -500,7 +672,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                   setState(() {
                     _selectedTemplate = null;
                     _costController.clear();
-                    _currentStep = ClockOutStep.input;
+                    _currentStep = ClockOutStep.lessons;
                   });
                 },
               ),
@@ -513,16 +685,15 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
                   setState(() {
                     _selectedTemplate = null;
                     _costController.text = '0';
-                    _currentStep = ClockOutStep.confirmation;
+                    _currentStep = ClockOutStep.lessons;
                   });
-                  _startAutoConfirmTimer();
                 },
               ),
             ],
           ),
         ),
       ],
-    ).animate().fadeIn();
+    );
   }
 
   Widget _buildSelectionCard(
@@ -567,66 +738,203 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
     );
   }
 
-  Widget _buildInputStep(BuildContext context) {
+  Widget _buildLessonsStep(BuildContext context) {
+    final attendance = ref.watch(currentAttendanceProvider);
+    final clockInTime =
+        attendance != null && attendance['clock_in_time'] != null
+        ? DateTime.parse(attendance['clock_in_time']).toLocal()
+        : null;
+    final dayOfWeek = clockInTime?.weekday ?? DateTime.now().weekday;
+    final adjustedDayOfWeek = dayOfWeek % 7; // Convert to 0=Sunday format
+
+    // Get timetables for today
+    final timetables = _school?['timetables'] as List<dynamic>? ?? [];
+    final todayLessons = timetables
+        .where((t) => t['day_of_week'] == adjustedDayOfWeek)
+        .toList();
+
+    // Calculate default overtime based on selected lessons
+    void _updateOvertimeFromLessons() {
+      _calculateAndSetOvertime();
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _resetState,
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: _resetState,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'コマ数と残業時間',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                // Lessons selected count display
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '選択中: ${_selectedLessonIds.length}コマ',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    if (_selectedLessonIds.length > 5)
+                      const Text(
+                        '最大5コマまで',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.errorColor,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Timetable selection
+                if (todayLessons.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        '今日のレッスンはありません',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ...todayLessons.map((lesson) {
+                    final lessonId = lesson['lesson_id'] as int;
+                    final isSelected = _selectedLessonIds.contains(lessonId);
+                    final startTime = lesson['start_time'] as String;
+                    final endTime = lesson['end_time'] as String;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 60,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedLessonIds.remove(lessonId);
+                              } else {
+                                if (_selectedLessonIds.length < 5) {
+                                  _selectedLessonIds.add(lessonId);
+                                }
+                              }
+                              _updateOvertimeFromLessons();
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSelected
+                                ? AppTheme.primaryColor
+                                : Colors.white,
+                            foregroundColor: isSelected
+                                ? Colors.white
+                                : AppTheme.textPrimary,
+                            side: BorderSide(
+                              color: isSelected
+                                  ? AppTheme.primaryColor
+                                  : AppTheme.primaryColor.withOpacity(0.3),
+                              width: 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: isSelected ? 4 : 1,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '$startTime - $endTime',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppTheme.textPrimary,
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                const SizedBox(height: 24),
+                // Overtime input (in minutes)
+                TextField(
+                  controller: _overtimeController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: '残業時間（分）',
+                    labelStyle: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                    border: OutlineInputBorder(),
+                    hintText: '0',
+                    suffixText: '分',
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              '金額を入力',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const Spacer(),
-        TextField(
-          controller: _costController,
-          autofocus: true,
-          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.currency_yen, size: 40),
-            border: InputBorder.none,
-            hintText: '0',
           ),
-          onSubmitted: (_) {
-            setState(() {
-              _currentStep = ClockOutStep.confirmation;
-            });
-            _startAutoConfirmTimer();
-          },
         ),
-        const Spacer(),
-        SizedBox(
-          width: double.infinity,
-          height: 60,
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _currentStep = ClockOutStep.confirmation;
-              });
-              _startAutoConfirmTimer();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-            ),
-            child: const Text(
-              '次へ',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: SizedBox(
+            width: double.infinity,
+            height: 60,
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _currentStep = ClockOutStep.confirmation;
+                });
+                _startAutoConfirmTimer();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+              ),
+              child: const Text(
+                '次へ',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ),
       ],
-    ).animate().fadeIn();
+    );
   }
 
   Widget _buildConfirmationStep(BuildContext context) {
@@ -651,28 +959,50 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
           ),
           child: Column(
             children: [
-              // Lesson Count Input
-              TextField(
-                controller: _lessonCountController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'コマ数',
-                  labelStyle: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
+              // Lesson Count Display
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'コマ数',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 16,
+                  Text(
+                    '${_selectedLessonIds.length}コマ',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
-                ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Overtime Hours Display
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '残業時間',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '${_overtimeController.text}分',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               const Divider(),
@@ -696,7 +1026,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
               ),
             ],
           ),
-        ).animate().fadeIn().slideY(begin: -0.2, end: 0),
+        ),
         const Spacer(),
         Stack(
           alignment: Alignment.center,
@@ -722,49 +1052,37 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
               ),
             ),
             SizedBox(
-                  width: 260,
-                  height: 260,
-                  child: ElevatedButton(
-                    onPressed: _handleClockOut,
-                    style: ElevatedButton.styleFrom(
-                      shape: const CircleBorder(),
-                      backgroundColor: AppTheme.secondaryColor,
-                      elevation: 12,
-                      shadowColor: AppTheme.secondaryColor.withOpacity(0.5),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.exit_to_app,
-                          size: 64,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '退勤する',
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                .animate(
-                  onPlay: (controller) => controller.repeat(reverse: true),
-                )
-                .scale(
-                  begin: const Offset(1, 1),
-                  end: const Offset(1.03, 1.03),
-                  duration: 1500.ms,
-                )
-                .shimmer(
-                  duration: 2000.ms,
-                  color: Colors.white.withOpacity(0.2),
+              width: 260,
+              height: 260,
+              child: ElevatedButton(
+                onPressed: _handleClockOut,
+                style: ElevatedButton.styleFrom(
+                  shape: const CircleBorder(),
+                  backgroundColor: AppTheme.secondaryColor,
+                  elevation: 12,
+                  shadowColor: AppTheme.secondaryColor.withOpacity(0.5),
                 ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.exit_to_app,
+                      size: 64,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '退勤する',
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
         const Spacer(),
@@ -779,7 +1097,7 @@ class _ClockOutScreenState extends ConsumerState<ClockOutScreen> {
               Text('内容を変更する'),
             ],
           ),
-        ).animate().fadeIn(),
+        ),
       ],
     );
   }
