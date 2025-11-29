@@ -1,4 +1,6 @@
 import os
+from datetime import datetime, timezone
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
@@ -33,25 +35,139 @@ supabase: Client = create_client(url, key)
 class ScanRequest(BaseModel):
     card_id: str
 
+class ScanResponse(BaseModel):
+    status: str  # "ready_to_in", "ready_to_out", "finished"
+    user_name: str
+    message: str
+    default_cost: Optional[int] = 0
+    estimated_class_count: Optional[int] = 0
+    transport_presets: Optional[List[Dict[str, Any]]] = []
+
+class ClockInRequest(BaseModel):
+    card_id: str
+
+class ClockOutRequest(BaseModel):
+    card_id: str
+    transport_cost: int
+    class_count: int
+    is_auto_submit: bool = False
+
+
+#--- ヘルパー関数 ---
+def _get_user_by_card(card_id: str):
+    """カードIDからユーザーを検索する"""
+    res = supabase.table("users").select("*").eq("card_id", card_id).execute()
+    if not res.data:
+        return None
+    return res.data[0]
+
+def _get_active_log(user_id: str):
+    """現在出勤中（退勤していない）のログを取得する"""
+    res = supabase.table("attendance_logs")\
+        .select("*")\
+        .eq("user_id", user_id)\
+        .is_("clock_out_at", "null")\
+        .execute()
+    if res.data:
+        return res.data[0]
+    return None
+
+
+def _sync_system_a(user_name: str, transport: int, classes: int):
+    # TODO: 余裕があればここにシステムA連携を書く
+    print(f"[Mock] System A連携: {user_name} / {transport}円 / {classes}コマ")
+    return True
+
+
+
 # --- エンドポイント ---
 @app.get("/")
-def read_root():
-    return {"message": "Backend is running!"}
+def health_check():
+    return {"status": "ok", "message": "Backend is running"}
 
-@app.post("/api/scan")
+@app.post("/api/scan", response_model=ScanResponse)
 def scan_card(req: ScanRequest):
-    # DBからユーザー検索
-    response = supabase.table("users").select("*").eq("card_id", req.card_id).execute()
+    """カードをスキャンした時の状態判定"""
     
-    if not response.data:
-        # 未登録の場合
+    # 1. ユーザー特定
+    user = _get_user_by_card(req.card_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="未登録のカードです")
+    
+    # 2. 現在の状態を確認（出勤中か？）
+    active_log = _get_active_log(user['id'])
+    
+    if active_log:
+        # --- パターンB: 出勤中 -> 退勤画面へ誘導 ---
+        # コマ数はフロントエンドで計算して送信されるため、ここでは推定を行わない
+        return {
+            "status": "ready_to_out",
+            "user_name": user['name'],
+            "message": "お疲れ様でした。業務報告をお願いします。",
+            "default_cost": user.get('default_transport_cost', 0),
+            "estimated_class_count": 0,
+            "transport_presets": user.get('transport_presets', [])
+        }
+    else:
+        # --- パターンA: 未出勤 -> 出勤処理へ誘導 ---
+        return {
+            "status": "ready_to_in",
+            "user_name": user['name'],
+            "message": f"おはようございます、{user['name']}さん。",
+            "default_cost": 0,
+            "estimated_class_count": 0,
+            "transport_presets": []
+        }
+
+@app.post("/api/clock-in")
+def clock_in(req: ClockInRequest):
+    """出勤打刻"""
+    user = _get_user_by_card(req.card_id)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    user = response.data[0]
     
-    # 仮の実装: とりあえずユーザー名を返す
-    return {
-        "status": "ready_to_in", # ロジックは後で書くとして一旦固定
-        "user_name": user["name"],
-        "message": f"こんにちは、{user['name']}さん"
+    # 重複チェック（既に出勤中ならエラーにするか、無視するか）
+    if _get_active_log(user['id']):
+        raise HTTPException(status_code=400, detail="既に出勤済みです")
+    
+    # DB登録
+    data = {
+        "user_id": user['id'],
+        "clock_in_at": datetime.now(timezone.utc).isoformat()
     }
+    supabase.table("attendance_logs").insert(data).execute()
+    
+    return {"message": "出勤を記録しました"}
+
+@app.post("/api/clock-out")
+def clock_out(req: ClockOutRequest):
+    """退勤打刻 + 外部連携"""
+    user = _get_user_by_card(req.card_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    active_log = _get_active_log(user['id'])
+    if not active_log:
+        raise HTTPException(status_code=400, detail="出勤記録が見つかりません")
+    
+    # 1. DB更新 (退勤時間と実績を入力)
+    update_data = {
+        "clock_out_at": datetime.now(timezone.utc).isoformat(),
+        "transport_cost": req.transport_cost,
+        "class_count": req.class_count,
+        "is_auto_submit": req.is_auto_submit
+    }
+    
+    supabase.table("attendance_logs")\
+        .update(update_data)\
+        .eq("id", active_log['id'])\
+        .execute()
+    
+    # 2. 外部システム連携
+    # ここでエラーが起きてもDBの退勤記録は残るようにしている
+    try:
+        _sync_system_a(user['name'], req.transport_cost, req.class_count)
+    except Exception as e:
+        print(f"System A sync failed: {e}")
+    
+    return {"message": "退勤と業務報告が完了しました"}
