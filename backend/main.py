@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,27 +72,6 @@ def _get_active_log(user_id: str):
         return res.data[0]
     return None
 
-def _estimate_classes(clock_in_at_str: str) -> int:
-    """出勤時刻から現在のコマ数を推定する"""
-    if not clock_in_at_str:
-        return 0
-    
-    # 文字列をdatetimeに変換 (SupabaseはISO8601形式で返してくる)
-    clock_in = datetime.fromisoformat(clock_in_at_str.replace('Z', '+00:00'))
-    now = datetime.now(timezone.utc)
-    
-    # 滞在時間（分）
-    duration_min = (now - clock_in).total_seconds() / 60
-    
-    # 【ロジック】スクールの規定に合わせて調整してください
-    if duration_min < 60:
-        return 0
-    elif duration_min < 150: # 2.5時間未満 = 1コマ
-        return 1
-    elif duration_min < 240: # 4時間未満 = 2コマ
-        return 2
-    else:
-        return 3 # それ以上は3コマ
 
 def _sync_system_a(user_name: str, transport: int, classes: int):
     # TODO: 余裕があればここにシステムA連携を書く
@@ -120,14 +99,13 @@ def scan_card(req: ScanRequest):
     
     if active_log:
         # --- パターンB: 出勤中 -> 退勤画面へ誘導 ---
-        estimated = _estimate_classes(active_log['clock_in_at'])
-        
+        # コマ数はフロントエンドで計算して送信されるため、ここでは推定を行わない
         return {
             "status": "ready_to_out",
             "user_name": user['name'],
             "message": "お疲れ様でした。業務報告をお願いします。",
             "default_cost": user.get('default_transport_cost', 0),
-            "estimated_class_count": estimated,
+            "estimated_class_count": 0,
             "transport_presets": user.get('transport_presets', [])
         }
     else:
