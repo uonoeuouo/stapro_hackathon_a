@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class ClockOutPage extends StatelessWidget {
+class DeparturePage extends StatelessWidget {
   final String userName;
   final String cardId;
   final DateTime clockInTime;
   final DateTime clockOutTime;
   final VoidCallback onConfirm;
 
-  const ClockOutPage({
+  const DeparturePage({
     super.key,
     required this.userName,
     required this.cardId,

@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:dart_pcsc/dart_pcsc.dart' as pcsc;
 import '../services/scan_service.dart';
-import 'clock_in_page.dart';
-import 'clock_out_page.dart';
+import 'attendance_page.dart';
+import 'departure_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'classroom_selection_page.dart';
 
 class ScanPage extends StatefulWidget {
   final ScanService scanService;
@@ -201,7 +203,7 @@ class _ScanPageState extends State<ScanPage> {
         final result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ClockInPage(
+            builder: (context) => AttendancePage(
               userName: userName,
               onConfirm: () {
                 Navigator.pop(context, true);
@@ -236,7 +238,7 @@ class _ScanPageState extends State<ScanPage> {
         final result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ClockOutPage(
+            builder: (context) => DeparturePage(
               userName: userName,
               cardId: cardId,
               clockInTime: _clockInTime!,
@@ -284,9 +286,29 @@ class _ScanPageState extends State<ScanPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+
+
       appBar: AppBar(
         title: const Text('Attendance Scanner'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: '教室を変更',
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('selected_classroom');
+
+              if (context.mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const ClassroomSelectionPage(),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: Center(
         child: Padding(

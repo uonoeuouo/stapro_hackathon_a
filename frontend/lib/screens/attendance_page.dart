@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-class ClockInPage extends StatelessWidget {
+class AttendancePage extends StatelessWidget {
   final String userName;
   final VoidCallback onConfirm;
 
-  const ClockInPage({
+  const AttendancePage({
     super.key,
     required this.userName,
     required this.onConfirm,
