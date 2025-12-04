@@ -92,14 +92,6 @@ def _get_active_log(user_id: str):
 
     return None
 
-
-def _sync_system_a(user_name: str, transport: int, classes: int):
-    # TODO: 余裕があればここにシステムA連携を書く
-    print(f"[Mock] System A連携: {user_name} / {transport}円 / {classes}コマ")
-    return True
-
-
-
 # --- エンドポイント ---
 @app.get("/")
 def health_check():
@@ -123,7 +115,7 @@ def scan_card(req: ScanRequest):
         return {
             "status": "ready_to_out",
             "user_name": user['name'],
-            "message": "お疲れ様でした。",
+            "message": "お疲れ様です、{user['name']}さん。",
             "default_cost": user.get('default_transport_cost', 0),
             "estimated_class_count": 0,
             "transport_presets": user.get('transport_presets', []),
