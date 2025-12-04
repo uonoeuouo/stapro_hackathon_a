@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NFCReaderUsageDescription</key>
+	<string>NFC tags are used to clock in and out.</string>
 </dict>
 </plist>
