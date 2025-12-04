@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from stapro_api_client import StaproAPIClient
+from datetime import date
 
 # 環境変数の読み込み
 load_dotenv()
@@ -110,7 +112,15 @@ def scan_card(req: ScanRequest):
         }
     else:
         # --- パターンA: 未出勤 -> 出勤処理へ誘導 ---
-        return {
+        # ここで Stapro 側の勤怠状況を確認し、連鎖的に処理を行う
+        stapro_url = os.getenv("STAPRO_API_URL")
+        stapro_token = os.getenv("STAPRO_API_TOKEN")
+
+        # ユーザーに Stapro 側のスタッフID があればそれを使う（なければローカルの user['id'] を利用）
+        staff_id = user.get('stapro_staff_id') or user.get('staff_id') or user.get('id')
+
+        # デフォルトの応答内容
+        response_payload = {
             "status": "ready_to_in",
             "user_name": user['name'],
             "message": f"おはようございます、{user['name']}さん。",
@@ -118,6 +128,81 @@ def scan_card(req: ScanRequest):
             "estimated_class_count": 0,
             "transport_presets": []
         }
+
+        # Stapro API に問い合わせて勤怠一覧を取得し、状態に応じてローカル DB 保存や create_attendance を行う
+        if stapro_url and stapro_token and staff_id:
+            try:
+                client = StaproAPIClient(base_url=stapro_url, api_token=stapro_token)
+                try:
+                    attendances_res = client.get_attendances(int(staff_id))
+                except Exception:
+                    # API の返り値が dict/list か不明なので例外は握りつぶしてローカル動作にフォールバック
+                    attendances_res = None
+
+                # attendances_res は dict{'attendances': [...]} か list の可能性がある
+                attendances = None
+                if isinstance(attendances_res, dict):
+                    attendances = attendances_res.get('attendances') or []
+                elif isinstance(attendances_res, list):
+                    attendances = attendances_res
+
+                # 活動中の勤怠があるか（clock_out_at が null/空のもの）をチェック
+                has_active = False
+                if attendances:
+                    for a in attendances:
+                        if a is None:
+                            continue
+                        # フィールド名は API によるが、'clock_out_at' が None/空なら出勤中とみなす
+                        if a.get('clock_out_at') in (None, "", "null"):
+                            has_active = True
+                            break
+
+                if not attendances or not has_active:
+                    # Stapro に出勤中レコードが無い -> ローカル DB に出勤時刻を保存
+                    data = {
+                        "user_id": user['id'],
+                        "clock_in_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    supabase.table("attendance_logs").insert(data).execute()
+                    response_payload['message'] = "外部勤怠が未作成のため、ローカルで出勤を記録しました。"
+                else:
+                    # Stapro に出勤中レコードが存在 -> Stapro に新規勤怠を作成（可能なら）
+                    try:
+                        work_day = date.today().isoformat()
+                        school_id = user.get('stapro_school_id') or user.get('default_school_id') or 1
+                        commuting_costs = int(user.get('default_transport_cost', 0) or 0)
+                        # create_attendance の最低限のパラメータを用意する（lesson_ids は空リストで送る）
+                        client.create_attendance(
+                            staff_id=int(staff_id),
+                            work_day=work_day,
+                            school_id=int(school_id),
+                            commuting_costs=commuting_costs,
+                            another_time=0.0,
+                            total_lesson=0,
+                            lesson_ids=[],
+                        )
+                        # ローカルにも出勤時刻を残しておく
+                        data = {
+                            "user_id": user['id'],
+                            "clock_in_at": datetime.now(timezone.utc).isoformat()
+                        }
+                        supabase.table("attendance_logs").insert(data).execute()
+                        response_payload['message'] = "Stapro に勤怠を作成し、ローカル出勤を記録しました。"
+                    except Exception as e:
+                        # 失敗してもスキャン操作は完了させる（ログを残す）
+                        print(f"Failed to create attendance on Stapro: {e}")
+                        response_payload['message'] = "外部勤怠作成に失敗しましたが、ローカルで出勤を記録しました。"
+            except Exception as e:
+                # Stapro クライアント生成に失敗したらフォールバックでローカル記録
+                print(f"Stapro client error: {e}")
+                data = {
+                    "user_id": user['id'],
+                    "clock_in_at": datetime.now(timezone.utc).isoformat()
+                }
+                supabase.table("attendance_logs").insert(data).execute()
+                response_payload['message'] = "Stapro 連携に失敗したため、ローカルで出勤を記録しました。"
+
+        return response_payload
 
 @app.post("/api/clock-in")
 def clock_in(req: ClockInRequest):

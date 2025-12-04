@@ -223,21 +223,20 @@ class StaproAPIClient:
             ...     lesson_ids=[1, 2, 3, 4]
             ... )
         """
-        return self._post('/api/v1/attendances', {
-            'attendance': {
-                'staff_id': staff_id,
-                'work_day': work_day,
-                'school_id': school_id,
-                'commuting_costs': commuting_costs,
-                'another_time': another_time,
-                'total_lesson': total_lesson,
-                'total_training_lesson': total_training_lesson,
-                'deduction_time': deduction_time,
-                'note': note
-            },
+        # API が期待するフラットなリクエストボディ形式に合わせる
+        payload = {
+            'staff_id': staff_id,
+            'work_day': work_day,
+            'school_id': school_id,
+            'commuting_costs': commuting_costs,
+            'another_time': another_time,
+            'total_lesson': total_lesson,
             'lesson_ids': lesson_ids,
-            'total_training_lesson': total_training_lesson
-        })
+            'total_training_lesson': total_training_lesson,
+            'deduction_time': deduction_time,
+            'note': note,
+        }
+        return self._post('/api/v1/attendances', payload)
 
     def delete_attendance(self, attendance_id: int) -> Dict[str, Any]:
         """
