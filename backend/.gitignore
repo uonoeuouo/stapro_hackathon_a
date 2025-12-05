@@ -1,0 +1,3 @@
+# Python bytecode
+venv/
+__pycache__/
