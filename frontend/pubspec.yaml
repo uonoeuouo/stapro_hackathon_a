@@ -37,6 +37,9 @@ dependencies:
   intl: ^0.18.1
   openapi:
     path: ./lib/api
+  nfc_manager: ^4.1.1
+  dart_pcsc: ^2.0.2
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
