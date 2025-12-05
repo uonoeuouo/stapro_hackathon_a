@@ -4,7 +4,7 @@
 Write-Host "Fetching OpenAPI spec from backend..."
 
 # 2. 自動生成コマンド実行
-openapi-generator generate `
+openapi-generator-cli generate `
   -i http://127.0.0.1:8000/openapi.json `
   -g dart-dio `
   -o ./frontend_api_client `
