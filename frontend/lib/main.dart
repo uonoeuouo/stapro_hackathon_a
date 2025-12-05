@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/classroom_selection_page.dart';
-import 'screens/scan_page.dart';
+import 'screen/classroom_selection_page.dart';
+import 'screen/scan_page.dart';
 import 'services/scan_service.dart';
 import 'services/mock_scan_service.dart';
 

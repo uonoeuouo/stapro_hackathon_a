@@ -9,14 +9,100 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**readRootGet**](DefaultApi.md#readrootget) | **GET** / | Read Root
+[**clockInApiClockInPost**](DefaultApi.md#clockinapiclockinpost) | **POST** /api/clock-in | Clock In
+[**clockOutApiClockOutPost**](DefaultApi.md#clockoutapiclockoutpost) | **POST** /api/clock-out | Clock Out
+[**healthCheckGet**](DefaultApi.md#healthcheckget) | **GET** / | Health Check
 [**scanCardApiScanPost**](DefaultApi.md#scancardapiscanpost) | **POST** /api/scan | Scan Card
 
 
-# **readRootGet**
-> JsonObject readRootGet()
+# **clockInApiClockInPost**
+> clockInApiClockInPost(clockInRequest)
 
-Read Root
+Clock In
+
+出勤打刻
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+
+final api = Openapi().getDefaultApi();
+final ClockInRequest clockInRequest = ; // ClockInRequest | 
+
+try {
+    api.clockInApiClockInPost(clockInRequest);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->clockInApiClockInPost: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **clockInRequest** | [**ClockInRequest**](ClockInRequest.md)|  | 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **clockOutApiClockOutPost**
+> clockOutApiClockOutPost(clockOutRequest)
+
+Clock Out
+
+退勤打刻 + 外部連携
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+
+final api = Openapi().getDefaultApi();
+final ClockOutRequest clockOutRequest = ; // ClockOutRequest | 
+
+try {
+    api.clockOutApiClockOutPost(clockOutRequest);
+} catch on DioException (e) {
+    print('Exception when calling DefaultApi->clockOutApiClockOutPost: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **clockOutRequest** | [**ClockOutRequest**](ClockOutRequest.md)|  | 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **healthCheckGet**
+> healthCheckGet()
+
+Health Check
 
 ### Example
 ```dart
@@ -25,10 +111,9 @@ import 'package:openapi/api.dart';
 final api = Openapi().getDefaultApi();
 
 try {
-    final response = api.readRootGet();
-    print(response);
+    api.healthCheckGet();
 } catch on DioException (e) {
-    print('Exception when calling DefaultApi->readRootGet: $e\n');
+    print('Exception when calling DefaultApi->healthCheckGet: $e\n');
 }
 ```
 
@@ -37,7 +122,7 @@ This endpoint does not need any parameter.
 
 ### Return type
 
-[**JsonObject**](JsonObject.md)
+void (empty response body)
 
 ### Authorization
 
@@ -51,9 +136,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **scanCardApiScanPost**
-> JsonObject scanCardApiScanPost(scanRequest)
+> ScanResponse scanCardApiScanPost(scanRequest)
 
 Scan Card
+
+カードをスキャンした時の状態判定
 
 ### Example
 ```dart
@@ -78,7 +165,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-[**JsonObject**](JsonObject.md)
+[**ScanResponse**](ScanResponse.md)
 
 ### Authorization
 

@@ -1,36 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // 日時フォーマットのために必要
-// main.dart や 適切な画面をインポート
-import 'confirm_page.dart';
-import 'fare_registration_page.dart';
+import 'package:intl/intl.dart';
 
-// 事前に定義したEmployeeDataクラスをインポート
-import 'package:frontend/data/employee.dart';
+class DeparturePage extends StatefulWidget {
+  final String userName;
+  final String cardId;
+  final DateTime clockInTime;
+  final DateTime clockOutTime;
+  final VoidCallback onConfirm;
 
-class DepartureScreen extends StatefulWidget {
-  final EmployeeData employeeData;
-
-  const DepartureScreen({super.key, required this.employeeData});
+  const DeparturePage({
+    super.key,
+    required this.userName,
+    required this.cardId,
+    required this.clockInTime,
+    required this.clockOutTime,
+    required this.onConfirm,
+  });
 
   @override
-  State<DepartureScreen> createState() => _DepartureScreenState();
+  State<DeparturePage> createState() => _DeparturePageState();
 }
 
-class _DepartureScreenState extends State<DepartureScreen> {
-  // 交通費精算用の状態管理
-  int? _selectedFareIndex; // 選択肢 (0:なし, 1:手入力, 2:プリセット1, 3:プリセット2)
-  int? _selectedKoma; // 選択されたコマ数
-  int _manualFare = 0; // 手入力された交通費
-  TextEditingController _fareController = TextEditingController();
-
-  // フォームのキー
+class _DeparturePageState extends State<DeparturePage> {
+  int? _selectedFareIndex;
+  int? _selectedKoma;
+  int _manualFare = 0;
+  final TextEditingController _fareController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  // Mock Presets
+  final List<int> _presetFares = [500, 1000];
 
   @override
   void initState() {
     super.initState();
     _fareController.addListener(() {
-      // テキストフィールドの値が変更されたら、_manualFareを更新
       setState(() {
         _manualFare = int.tryParse(_fareController.text) ?? 0;
       });
@@ -43,84 +47,48 @@ class _DepartureScreenState extends State<DepartureScreen> {
     super.dispose();
   }
 
-  // 最終的に登録する交通費の金額を取得
   int get _finalFare {
-    if (_selectedFareIndex == 0) return 0; // なし
-    if (_selectedFareIndex == 1) return _manualFare; // 手入力
+    if (_selectedFareIndex == 0) return 0;
+    if (_selectedFareIndex == 1) return _manualFare;
     if (_selectedFareIndex != null && _selectedFareIndex! >= 2) {
-      // プリセット
-      return widget.employeeData.presetFares[_selectedFareIndex! - 2];
+      return _presetFares[_selectedFareIndex! - 2];
     }
     return 0;
   }
 
-  void _navigateToConfirmation() {
-    // 交通費が手入力の場合、フォームの検証を行う
+  void _submit() {
     if (_selectedFareIndex == 1 && !_formKey.currentState!.validate()) {
       return;
     }
 
-    // 退勤データを登録する処理（DB保存、API送信など）
-    print('退勤時刻: ${DateTime.now()}');
+    // TODO: Implement actual API call here
+    print('退勤時刻: ${widget.clockOutTime}');
     print('登録交通費: $_finalFare円');
     print('登録コマ数: $_selectedKomaコマ');
 
-    // 確認画面へ遷移 (ここではダミーの確認画面を使用)
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ConfirmationScreen(fare: _finalFare),
-      ),
-    );
+    widget.onConfirm();
   }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final clockIn = widget.employeeData.clockInTime;
-
-    // 日付と時刻のフォーマット
     final dateFormat = DateFormat('yyyy/MM/dd');
     final timeFormat = DateFormat('HH:mm:ss');
 
-    // 交通費の選択肢を生成
     final List<String> fareOptions = [
       'なし',
       '手入力',
-      ...widget.employeeData.presetFares.map((fare) => '${fare}円'),
+      ..._presetFares.map((fare) => '${fare}円'),
     ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('退勤処理'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () {
-              // 交通費登録画面へ遷移
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  // FareRegistrationScreen は const コンストラクタを持つと仮定
-                  builder: (context) => FareRegistrationScreen(
-                    employeeData: widget.employeeData,
-                  ),
-                ),
-              );
-            },
-            child: const Text(
-              '交通費登録',
-              style: TextStyle(color: Colors.black, fontSize: 16),
-            ),
-          ),
-          const SizedBox(width: 10), // 右端に少しスペースを空ける
-        ],
+        automaticallyImplyLeading: false,
       ),
       body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch, // 縦いっぱいに広げる
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          // ==============================
-          // 🔷 左側: 基本情報表示エリア (Expandedで均等に分割)
-          // ==============================
+          // Left Side: Info
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(30.0),
@@ -137,20 +105,16 @@ class _DepartureScreenState extends State<DepartureScreen> {
                         color: Colors.blueAccent),
                   ),
                   const SizedBox(height: 20),
-                  _buildInfoRow('社員名:', widget.employeeData.name),
-                  _buildInfoRow('日付:', dateFormat.format(now)),
-                  _buildInfoRow('出勤時刻:', timeFormat.format(clockIn)),
-                  _buildInfoRow('退勤時刻:', timeFormat.format(now)),
-                  const SizedBox(height: 30),
-                  // 総労働時間などを計算して表示しても良い
+                  _buildInfoRow('社員名:', widget.userName),
+                  _buildInfoRow('日付:', dateFormat.format(widget.clockOutTime)),
+                  _buildInfoRow('出勤時刻:', timeFormat.format(widget.clockInTime)),
+                  _buildInfoRow('退勤時刻:', timeFormat.format(widget.clockOutTime)),
                 ],
               ),
             ),
           ),
 
-          // ==============================
-          // 🔶 右側: 交通費精算エリア (Expandedで均等に分割)
-          // ==============================
+          // Right Side: Form
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(30.0),
@@ -167,7 +131,6 @@ class _DepartureScreenState extends State<DepartureScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // 選択肢 (Radioボタン)
                     ...List.generate(fareOptions.length, (index) {
                       return RadioListTile<int>(
                         title: Text(fareOptions[index]),
@@ -181,7 +144,6 @@ class _DepartureScreenState extends State<DepartureScreen> {
                       );
                     }),
 
-                    // 手入力フィールド (選択されている場合のみ表示)
                     if (_selectedFareIndex == 1)
                       Padding(
                         padding: const EdgeInsets.only(
@@ -207,7 +169,6 @@ class _DepartureScreenState extends State<DepartureScreen> {
 
                     const SizedBox(height: 30),
 
-                    // コマ数選択 (交通費が選択されたら表示)
                     if (_selectedFareIndex != null) ...[
                       const Text(
                         '本日のコマ数',
@@ -232,16 +193,15 @@ class _DepartureScreenState extends State<DepartureScreen> {
                       ),
                     ],
 
-                    const Spacer(), // 下部にボタンを配置するためにスペースを埋める
+                    const Spacer(),
 
-                    // 交通費登録ボタン
                     SizedBox(
                       width: double.infinity,
                       height: 60,
                       child: ElevatedButton(
                         onPressed:
                             (_selectedFareIndex != null && _selectedKoma != null)
-                                ? _navigateToConfirmation
+                                ? _submit
                                 : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.lightGreen,
@@ -252,7 +212,7 @@ class _DepartureScreenState extends State<DepartureScreen> {
                               ? '交通費を選択してください'
                               : _selectedKoma == null
                                   ? 'コマ数を選択してください'
-                                  : '退勤登録と確認へ',
+                                  : '退勤登録を完了する',
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
@@ -267,7 +227,6 @@ class _DepartureScreenState extends State<DepartureScreen> {
     );
   }
 
-  // 情報表示用のヘルパーウィジェット
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
