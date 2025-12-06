@@ -1,366 +1,392 @@
-// lib/main.dart または lib/screens/home_screen.dart に実装
-
-import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:dio/dio.dart';
-// 出勤画面をインポート
+import 'package:nfc_manager/nfc_manager.dart';
+import 'package:dart_pcsc/dart_pcsc.dart' as pcsc;
+import '../services/scan_service.dart';
 import 'attendance_page.dart';
-import '../data/employee.dart'; // Employee, EmployeeDataクラス定義用
-
-//退勤画面をインポート
 import 'departure_page.dart';
-// fare_registration_page.dartは不要になったため削除
-import 'card_registrate_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'classroom_selection_page.dart';
 
-// API Service
-import '../services/api_service.dart';
-
-// Card Reader Service
-import '../services/card_reader_service.dart';
-
-// 出勤時刻を記録(退勤時に使用)
-DateTime? clockInTime;
-
-// ホーム画面(カードリーダーイベントを処理する場所)
 class ScanPage extends StatefulWidget {
-  const ScanPage({super.key});
+  final ScanService scanService;
+
+  const ScanPage({super.key, required this.scanService});
 
   @override
   State<ScanPage> createState() => _ScanPageState();
 }
 
 class _ScanPageState extends State<ScanPage> {
-  final ApiService _apiService = ApiService();
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  String _message = 'カードをスキャンしてください\n(またはIDを入力)';
   bool _isLoading = false;
-  String? _errorMessage;
-
-  // カードリーダー関連
-  CardReaderType _selectedReaderType = CardReaderType.keyboard;
-  late NfcCardReader _nfcReader;
-  late KeyboardCardReader _keyboardReader;
-  late ManualCardReader _manualReader;
-  StreamSubscription<String>? _cardIdSubscription;
+  
+  // Attendance State
+  bool _isClockedIn = false;
+  DateTime? _clockInTime;
+  String? _currentUserName;
+  
+  // NFC State
   bool _nfcAvailable = false;
+  String _nfcStatus = 'Checking NFC...';
+  
+  // PCSC Context
+  pcsc.Context? _pcscContext;
 
   @override
   void initState() {
     super.initState();
-    _initializeCardReaders();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+    _initNfc();
   }
-
+  
   @override
   void dispose() {
-    _cardIdSubscription?.cancel();
-    _nfcReader.dispose();
-    _keyboardReader.dispose();
-    _manualReader.dispose();
+    if (Platform.isIOS || Platform.isAndroid) {
+      NfcManager.instance.stopSession();
+    } else if (Platform.isWindows) {
+      _pcscContext?.release();
+    }
     super.dispose();
   }
 
-  // カードリーダーを初期化
-  Future<void> _initializeCardReaders() async {
-    _nfcReader = NfcCardReader();
-    _keyboardReader = KeyboardCardReader();
-    _manualReader = ManualCardReader();
+  Future<void> _initNfc() async {
+    try {
+      if (Platform.isIOS || Platform.isAndroid) {
+        // --- Mobile (nfc_manager) ---
+        bool isAvailable = await NfcManager.instance.isAvailable();
+        if (!mounted) return;
+        setState(() {
+          _nfcAvailable = isAvailable;
+          _nfcStatus = isAvailable ? 'NFC Ready (Mobile)' : 'NFC Not Available';
+        });
 
-    // NFCが利用可能かチェック
-    _nfcAvailable = await _nfcReader.isAvailable();
-    
-    if (_nfcAvailable) {
+        if (isAvailable) {
+          NfcManager.instance.startSession(
+            pollingOptions: {NfcPollingOption.iso14443, NfcPollingOption.iso15693},
+            onDiscovered: (NfcTag tag) async {
+              String? id;
+              // ignore: invalid_use_of_protected_member
+              final Map<String, dynamic> data = Map<String, dynamic>.from(tag.data as Map);
+              
+              List<int>? idBytes;
+              if (data.containsKey('isodep')) {
+                idBytes = data['isodep']['identifier']?.cast<int>();
+              } else if (data.containsKey('nfca')) {
+                idBytes = data['nfca']['identifier']?.cast<int>();
+              } else if (data.containsKey('nfcb')) {
+                idBytes = data['nfcb']['identifier']?.cast<int>();
+              } else if (data.containsKey('nfcf')) {
+                idBytes = data['nfcf']['identifier']?.cast<int>();
+              } else if (data.containsKey('nfcv')) {
+                idBytes = data['nfcv']['identifier']?.cast<int>();
+              } else if (data.containsKey('mifare')) { 
+                 idBytes = data['mifare']['identifier']?.cast<int>();
+              }
+
+              if (idBytes != null) {
+                id = idBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
+              } else {
+                 id = "UNKNOWN_ID";
+              }
+              
+              _handleScan(id);
+            }
+          );
+        }
+      } else if (Platform.isWindows) {
+        // --- Windows (dart_pcsc) ---
+        try {
+          _pcscContext = pcsc.Context(pcsc.Scope.user);
+          await _pcscContext!.establish();
+          if (!mounted) return;
+          setState(() {
+            _nfcAvailable = true;
+            _nfcStatus = 'NFC Ready (PCSC)';
+          });
+          _pollPcscWindows();
+        } catch (e) {
+          setState(() {
+            _nfcAvailable = false;
+            _nfcStatus = 'PCSC Error: $e';
+          });
+        }
+      }
+    } catch (e) {
       setState(() {
-        _selectedReaderType = CardReaderType.nfc;
+        _nfcStatus = 'Error: $e';
       });
     }
-
-    // 選択されたリーダーを開始
-    await _startSelectedReader();
   }
 
-  // 選択されたカードリーダーを開始
-  Future<void> _startSelectedReader() async {
-    // 既存のサブスクリプションをキャンセル
-    await _cardIdSubscription?.cancel();
-
-    // すべてのリーダーを停止
-    await _nfcReader.stop();
-    await _keyboardReader.stop();
-    await _manualReader.stop();
-
-    // 選択されたリーダーを開始してストリームを購読
-    switch (_selectedReaderType) {
-      case CardReaderType.nfc:
-        await _nfcReader.start();
-        _cardIdSubscription = _nfcReader.cardIdStream.listen(_onCardScanned);
-        break;
-      case CardReaderType.keyboard:
-        await _keyboardReader.start();
-        _cardIdSubscription = _keyboardReader.cardIdStream.listen(_onCardScanned);
-        break;
-      case CardReaderType.manual:
-        await _manualReader.start();
-        _cardIdSubscription = _manualReader.cardIdStream.listen(_onCardScanned);
-        break;
+  Future<void> _pollPcscWindows() async {
+    while (mounted && _pcscContext != null) {
+      try {
+        List<String> readers = await _pcscContext!.listReaders();
+        
+        if (readers.isNotEmpty) {
+          // Try the first reader
+          String reader = readers.first;
+          
+          try {
+            // Share Shared, Protocol Any
+            pcsc.Card card = await _pcscContext!.connect(
+              reader, 
+              pcsc.ShareMode.shared, 
+              pcsc.Protocol.any
+            );
+            
+            // Send APDU to get UID (Standard Get Data)
+            // Class: 0xFF, INS: 0xCA, P1: 0x00, P2: 0x00, Le: 0x00
+            Uint8List response = await card.transmit(
+              Uint8List.fromList([0xFF, 0xCA, 0x00, 0x00, 0x00])
+            );
+            
+            // Check SW1 SW2 (Last 2 bytes)
+            if (response.length >= 2) {
+              int sw1 = response[response.length - 2];
+              int sw2 = response[response.length - 1];
+              
+              if (sw1 == 0x90 && sw2 == 0x00) {
+                // UID is response without SW
+                List<int> uidBytes = response.sublist(0, response.length - 2);
+                String id = uidBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
+                
+                if (id.isNotEmpty) {
+                  _handleScan(id);
+                  // Wait a bit longer after success to avoid multi-scan
+                  await Future.delayed(const Duration(seconds: 2));
+                }
+              }
+            }
+            
+            // Disposition Leave
+            await card.disconnect(pcsc.Disposition.resetCard);
+            
+          } catch (e) {
+            // Card might not be present or connection failed
+          }
+        }
+        
+        // Poll interval
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+      } catch (e) {
+        // Context error or list readers failed
+        await Future.delayed(const Duration(seconds: 1));
+      }
     }
   }
 
-  // カードがスキャンされた時の処理
-  void _onCardScanned(String scannedCardId) async {
-  if (_isLoading) return; // 既に処理中の場合は無視
+  Future<void> _handleScan(String cardId) async {
+    if (cardId.isEmpty) return;
 
-  print('カードがスキャンされました: $scannedCardId');
-
-  // ローディング状態を表示
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
-
-  try {
-    // API呼び出し
-    final response = await _apiService.scanCard(scannedCardId);
-
-    // 成功時の処理
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
+      _message = '読み込み中... (ID: $cardId)';
     });
 
-    // ステータスに応じて画面遷移
-    if (response.status == 'ready_to_in') {
-      // 出勤処理へ遷移
-      // NOTE: この処理が正しいかどうかは文脈によりますが、ここではそのままにします。
-      // もし clockInTime が AttendanceScreen に必要なければ、削除可能です。
-      clockInTime = DateTime.now(); 
+    try {
+      // 1. Validate Card with Backend
+      final data = await widget.scanService.scanCard(cardId);
+      final userName = data['user_name'] ?? 'Unknown User';
+      
+      if (!mounted) return;
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AttendanceScreen(
-            employee: Employee(
-              id: 'EMP_API', // APIから取得できないため仮のID
-              name: response.userName,
+      if (!_isClockedIn) {
+        // --- Go to Clock In ---
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AttendancePage(
+              userName: userName,
+              onConfirm: () {
+                Navigator.pop(context, true);
+              },
             ),
           ),
-        ),
-      );
-    } else if (response.status == 'ready_to_out') {
-      // 退勤処理へ遷移
-      // プリセット交通費をList<int>に変換
-      final presetFares = response.transportPresets?.map((preset) {
-        return preset.amount;
-      }).toList() ?? <int>[];
+        );
 
-      final employeeData = EmployeeData(
-        name: response.userName,
-        clockInTime: clockInTime ?? DateTime.now(),
-        presetFares: presetFares,
-      );
+        if (result == true) {
+          setState(() {
+            _isClockedIn = true;
+            _clockInTime = DateTime.now();
+            _currentUserName = userName;
+            _message = '出勤しました: $userName\n出勤時間: ${_formatTime(_clockInTime!)}';
+          });
+        } else {
+           setState(() {
+            _message = 'キャンセルされました';
+          });
+        }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DepartureScreen(
-            employeeData: employeeData,
+      } else {
+        // --- Go to Clock Out ---
+        if (_currentUserName != null && _currentUserName != userName) {
+           setState(() {
+            _message = 'エラー: 別のユーザーが出勤中です\n($_currentUserName)';
+          });
+          return;
+        }
+
+        final now = DateTime.now();
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DeparturePage(
+              userName: userName,
+              cardId: cardId,
+              clockInTime: _clockInTime!,
+              clockOutTime: now,
+              onConfirm: () {
+                Navigator.pop(context, true);
+              },
+            ),
           ),
-        ),
-      );
-    } else {
-      // 予期しないステータス
+        );
+
+        if (result == true) {
+          setState(() {
+            _isClockedIn = false;
+            _clockInTime = null;
+            _currentUserName = null;
+            _message = '退勤しました: $userName\nお疲れ様でした';
+          });
+        } else {
+           setState(() {
+            _message = 'キャンセルされました';
+          });
+        }
+      }
+
+    } catch (e) {
       setState(() {
-        _errorMessage = 'APIから予期しないステータスが返されました: ${response.status}';
+        _message = 'エラー: $e';
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _controller.clear();
+          _focusNode.requestFocus();
+        });
+      }
     }
-
-  } on DioException catch (e) { // Dio固有のエラーをここで捕捉
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (e.response?.statusCode == 404) {
-      // 404: カード未登録の場合、カード登録画面へ遷移
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CardRegistratePage(
-            cardId: scannedCardId,
-          ),
-        ),
-      );
-    } else {
-      // その他の Dio エラー (接続エラー、タイムアウト、その他のステータスコードなど)
-      setState(() {
-        _errorMessage = 'APIエラーが発生しました: ${e.message} (ステータスコード: ${e.response?.statusCode})';
-      });
-    }
-
-  } catch (e) { // その他の予期しないエラーをここで捕捉
-    setState(() {
-      _isLoading = false;
-      _errorMessage = '予期しないエラーが発生しました: $e';
-    });
   }
-}
-
-  // リーダータイプを変更
-  void _changeReaderType(CardReaderType? newType) {
-    if (newType == null || newType == _selectedReaderType) return;
-    
-    setState(() {
-      _selectedReaderType = newType;
-    });
-    
-    _startSelectedReader();
-  }
-
-  // 手動入力ダイアログを表示
-  void _showManualInput() {
-    _manualReader.showInputDialog(context);
+  
+  String _formatTime(DateTime dt) {
+    return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
   }
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: FocusNode()..requestFocus(),
-      autofocus: true,
-      onKeyEvent: (event) {
-        if (_selectedReaderType == CardReaderType.keyboard) {
-          _keyboardReader.handleKeyEvent(event);
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('カードリーダーシステム'),
-        ),
-        body: Center(
+    return Scaffold(
+
+
+      appBar: AppBar(
+        title: const Text('Attendance Scanner'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: '教室を変更',
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('selected_classroom');
+
+              if (context.mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const ClassroomSelectionPage(),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              // カードリーダータイプ選択
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+            children: [
+              // Status Indicator
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isClockedIn ? Colors.green.shade100 : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: _isClockedIn ? Colors.green : Colors.grey),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      '読み取り方法',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButton<CardReaderType>(
-                      value: _selectedReaderType,
-                      items: [
-                        if (_nfcAvailable)
-                          const DropdownMenuItem(
-                            value: CardReaderType.nfc,
-                            child: Row(
-                              children: [
-                                Icon(Icons.nfc),
-                                SizedBox(width: 8),
-                                Text('NFC/Felica'),
-                              ],
-                            ),
-                          ),
-                        const DropdownMenuItem(
-                          value: CardReaderType.keyboard,
-                          child: Row(
-                            children: [
-                              Icon(Icons.keyboard),
-                              SizedBox(width: 8),
-                              Text('USBキーボード入力'),
-                            ],
-                          ),
-                        ),
-                        const DropdownMenuItem(
-                          value: CardReaderType.manual,
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit),
-                              SizedBox(width: 8),
-                              Text('手動入力'),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onChanged: _changeReaderType,
+                    Icon(_isClockedIn ? Icons.work : Icons.home, color: _isClockedIn ? Colors.green : Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isClockedIn ? '勤務中 ($_currentUserName)' : '待機中',
+                      style: TextStyle(
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold,
+                        color: _isClockedIn ? Colors.green.shade800 : Colors.grey.shade800
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
+              Text(_nfcStatus, style: TextStyle(color: _nfcAvailable ? Colors.blue : Colors.red)),
+              const SizedBox(height: 48),
               
+              Text(
+                _message,
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 48),
+              
+              // Input for Card ID (Simulating NFC)
+              TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Scan Card (or type ID)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Waiting for card...',
+                  suffixIcon: Icon(Icons.nfc),
+                ),
+                onSubmitted: _handleScan,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Mock NFC Button
+              ElevatedButton.icon(
+                onPressed: () => _handleScan("mock_card_123"),
+                icon: const Icon(Icons.nfc),
+                label: const Text("【Mock】NFCタッチをシミュレート"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple.shade50,
+                  foregroundColor: Colors.deepPurple,
+                ),
+              ),
+
               if (_isLoading)
-                const Column(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 20),
-                    Text(
-                      'カード情報を確認中...',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  ],
-                )
-              else ...[
-                // 読み取り方法に応じた説明文
-                Icon(
-                  _selectedReaderType == CardReaderType.nfc
-                      ? Icons.nfc
-                      : _selectedReaderType == CardReaderType.keyboard
-                          ? Icons.keyboard
-                          : Icons.edit,
-                  size: 64,
-                  color: Colors.blue,
+                const Padding(
+                  padding: EdgeInsets.only(top: 16.0),
+                  child: CircularProgressIndicator(),
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  _getInstructionText(),
-                  style: const TextStyle(fontSize: 20),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 40),
-                
-                // 手動入力の場合のみボタンを表示
-                if (_selectedReaderType == CardReaderType.manual)
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _showManualInput,
-                    icon: const Icon(Icons.edit),
-                    label: const Text(
-                      'カードIDを入力',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(20),
-                    ),
-                  ),
-                
-                const SizedBox(height: 20),
-                if (_errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      _errorMessage!,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 16,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-              ],
             ],
           ),
         ),
       ),
     );
   }
-
-  String _getInstructionText() {
-    switch (_selectedReaderType) {
-      case CardReaderType.nfc:
-        return 'カードをかざしてください';
-      case CardReaderType.keyboard:
-        return 'カードをスキャンしてください\n(USBカードリーダー)';
-      case CardReaderType.manual:
-        return '下のボタンをタップして\nカードIDを入力してください';
-    }
-  }
 }
-
