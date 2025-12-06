@@ -6,11 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 // 出勤画面をインポート
 import 'attendance_page.dart';
-import '../data/employee.dart'; // Mockデータをインポート
+import '../data/employee.dart'; // Employee, EmployeeDataクラス定義用
 
 //退勤画面をインポート
 import 'departure_page.dart';
-import 'fare_registration_page.dart';
+// fare_registration_page.dartは不要になったため削除
 import 'card_registrate_page.dart';
 
 // API Service
@@ -133,7 +133,11 @@ class _ScanPageState extends State<ScanPage> {
           context,
           MaterialPageRoute(
             builder: (context) => AttendanceScreen(
-              employee: mockEmployee,
+              employee: Employee(
+                id: 'EMP_API', // APIから取得できないため仮のID
+                name: response.userName,
+                department: '部署未設定', // APIから取得できないため仮の部署
+              ),
             ),
           ),
         );
