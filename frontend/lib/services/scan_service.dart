@@ -1,4 +1,4 @@
-import 'dart:convert';
+liimport 'dart:convert';
 import 'dart:io';
 
 /// Abstract interface for the scanning service
@@ -21,7 +21,11 @@ class RealScanService implements ScanService {
   final String baseUrl;
 
   RealScanService({String? baseUrl}) 
-      : baseUrl = baseUrl ?? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+      : baseUrl = baseUrl ?? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000') {
+    print('RealScanService initialized.');
+    print('Platform.isAndroid: ${Platform.isAndroid}');
+    print('Base URL: ${this.baseUrl}');
+  }
 
   @override
   Future<Map<String, dynamic>> scanCard(String cardId) async {
