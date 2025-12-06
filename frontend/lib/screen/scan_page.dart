@@ -49,7 +49,7 @@ class _ScanPageState extends State<ScanPage> {
   void dispose() {
     if (Platform.isIOS || Platform.isAndroid) {
       NfcManager.instance.stopSession();
-    } else if (Platform.isWindows) {
+    } else if (Platform.isWindows || Platform.isMacOS) {
       _pcscContext?.release();
     }
     super.dispose();
@@ -99,7 +99,7 @@ class _ScanPageState extends State<ScanPage> {
             }
           );
         }
-      } else if (Platform.isWindows) {
+      } else if (Platform.isWindows || Platform.isMacOS) {
         // --- Windows (dart_pcsc) ---
         try {
           _pcscContext = pcsc.Context(pcsc.Scope.user);
@@ -109,7 +109,7 @@ class _ScanPageState extends State<ScanPage> {
             _nfcAvailable = true;
             _nfcStatus = 'NFC Ready (PCSC)';
           });
-          _pollPcscWindows();
+          _pollPcscDesktop();
         } catch (e) {
           setState(() {
             _nfcAvailable = false;
@@ -124,7 +124,7 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
-  Future<void> _pollPcscWindows() async {
+  Future<void> _pollPcscDesktop() async {
     while (mounted && _pcscContext != null) {
       try {
         List<String> readers = await _pcscContext!.listReaders();
