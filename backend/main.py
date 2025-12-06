@@ -57,6 +57,7 @@ class ClockOutRequest(BaseModel):
     transport_cost: int
     class_count: int
     is_auto_submit: bool = False
+    lesson_ids: Optional[List[int]] = None
 
 
 #--- 型定義 (追加モデル) ---
@@ -383,7 +384,7 @@ def clock_out(req: ClockOutRequest):
                     commuting_costs=int(req.transport_cost),
                     another_time=0.0,
                     total_lesson=int(req.class_count),
-                    lesson_ids=[],
+                    lesson_ids=(req.lesson_ids or []),
                 )
                 external_created = True
             except Exception as e:

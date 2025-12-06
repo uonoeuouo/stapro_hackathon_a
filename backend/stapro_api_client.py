@@ -15,6 +15,7 @@
 """
 
 import requests
+import logging
 from typing import Optional, Dict, List, Any
 from datetime import date
 
@@ -45,7 +46,17 @@ class StaproAPIClient:
     def _post(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """POSTリクエストを送信"""
         response = self.session.post(f"{self.base_url}{endpoint}", json=data)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            # Log payload and response body to help diagnose 4xx/5xx errors
+            try:
+                logging.error("Stapro API POST %s returned %s", endpoint, response.status_code)
+                logging.error("Request payload: %s", data)
+                logging.error("Response body: %s", response.text)
+            except Exception:
+                pass
+            raise
         return response.json()
 
     def _delete(self, endpoint: str) -> Dict[str, Any]:
