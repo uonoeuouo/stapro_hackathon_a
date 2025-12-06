@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/classroom_selection_page.dart';
-import 'screens/scan_page.dart';
-import 'services/scan_service.dart';
-import 'services/mock_scan_service.dart';
+import 'screen/classroom_selection_page.dart';
+import 'screen/scan_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +25,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: initialClassroom != null
-          ? ScanPage(scanService: MockScanService())
+          ? const ScanPage()
           : const ClassroomSelectionPage(),
     );
   }

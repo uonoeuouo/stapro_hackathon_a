@@ -4,13 +4,10 @@ import '../data/employee.dart'; // Employeeモデルをインポート
 import '../main.dart'; // プロジェクト名に合わせて修正してください
 
 class AttendanceScreen extends StatefulWidget {
-  // 遷移時に出勤状態フラグを更新するためのコールバック関数を受け取る
-  final Function(int) updateAttendanceStatus;
   final Employee employee;
 
   const AttendanceScreen({
     super.key,
-    required this.updateAttendanceStatus,
     required this.employee,
   });
 
@@ -28,12 +25,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.initState();
     // 画面が表示された瞬間に実行
 
-    // 1. 出勤状態を 1 に更新する (外部の変数へ反映)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.updateAttendanceStatus(1);
-    });
-
-    // 2. 5秒後にホーム画面へ自動遷移するタイマーを開始
+    // 5秒後にホーム画面へ自動遷移するタイマーを開始
     _startTimeoutTimer();
   }
 

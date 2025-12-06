@@ -1,19 +1,16 @@
 class Employee {
   final String id;
   final String name;
-  final String department;
 
   const Employee({
     required this.id,
     required this.name,
-    required this.department,
   });
 }
 
 const mockEmployee = Employee(
   id: 'EMP001',
   name: '山田 太郎',
-  department: '開発部',
 );
 
 class EmployeeData {

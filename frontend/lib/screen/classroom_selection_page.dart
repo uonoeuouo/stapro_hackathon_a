@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/scan_service.dart';
-import '../services/mock_scan_service.dart';
 import 'scan_page.dart';
 
 class ClassroomSelectionPage extends StatelessWidget {
@@ -41,9 +39,7 @@ class ClassroomSelectionPage extends StatelessWidget {
                 if (context.mounted) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder: (context) => ScanPage(
-                        scanService: MockScanService(),
-                      ),
+                      builder: (context) => const ScanPage(),
                     ),
                   );
                 }
