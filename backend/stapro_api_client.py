@@ -79,10 +79,23 @@ class StaproAPIClient:
                 ...
             }
         """
-        return self._post('/api/v1/auth/login', {
-            'email': email,
-            'password': password
-        })
+        # Try common login endpoints. Some deployments expose `/auth/login` (proxy),
+        # others use `/api/v1/auth/login` (direct API). Try both and return the first success.
+        payload = {'email': email, 'password': password}
+        last_exc = None
+        for endpoint in ['/auth/login', '/api/v1/auth/login']:
+            try:
+                return self._post(endpoint, payload)
+            except requests.exceptions.HTTPError as e:
+                # keep the last exception to raise if all attempts fail
+                last_exc = e
+                # try next endpoint
+                continue
+        # If we reach here, both endpoints failed — raise the last HTTPError
+        if last_exc:
+            raise last_exc
+        # Fallback: raise a generic error (shouldn't normally happen)
+        raise Exception('Authentication failed for unknown reasons')
 
     # ========================================
     # スタッフAPI
