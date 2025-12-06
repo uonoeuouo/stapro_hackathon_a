@@ -259,7 +259,7 @@ packages:
   openapi:
     dependency: "direct main"
     description:
-      path: "lib/api"
+      path: "../frontend_api_client"
       relative: true
     source: path
     version: "1.0.0"

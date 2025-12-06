@@ -1,3 +1,20 @@
-backend/venv/
-backend/__pycache__/
-backend/.env
+.env
+.DS_Store
+
+# generated files
+frontend_api_client/
+
+# temporary files
+node_modules/
+dist/
+
+# AI Agents
+.claude
+AGENTS.md
+CLAUDE.md
+openspec/
+
+
+# IDEs
+.idea/
+.vscode/
