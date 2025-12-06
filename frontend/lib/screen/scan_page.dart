@@ -106,91 +106,100 @@ class _ScanPageState extends State<ScanPage> {
 
   // カードがスキャンされた時の処理
   void _onCardScanned(String scannedCardId) async {
-    if (_isLoading) return; // 既に処理中の場合は無視
+  if (_isLoading) return; // 既に処理中の場合は無視
 
-    print('カードがスキャンされました: $scannedCardId');
+  print('カードがスキャンされました: $scannedCardId');
 
-    // ローディング状態を表示
+  // ローディング状態を表示
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+  });
+
+  try {
+    // API呼び出し
+    final response = await _apiService.scanCard(scannedCardId);
+
+    // 成功時の処理
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      _isLoading = false;
     });
 
-    try {
-      // API呼び出し
-      final response = await _apiService.scanCard(scannedCardId);
+    // ステータスに応じて画面遷移
+    if (response.status == 'ready_to_in') {
+      // 出勤処理へ遷移
+      // NOTE: この処理が正しいかどうかは文脈によりますが、ここではそのままにします。
+      // もし clockInTime が AttendanceScreen に必要なければ、削除可能です。
+      clockInTime = DateTime.now(); 
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      // ステータスに応じて画面遷移
-      if (response.status == 'ready_to_in') {
-        // 出勤処理へ遷移
-        clockInTime = DateTime.now();
-        
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AttendanceScreen(
-              employee: Employee(
-                id: 'EMP_API', // APIから取得できないため仮のID
-                name: response.userName,
-                department: '部署未設定', // APIから取得できないため仮の部署
-              ),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AttendanceScreen(
+            employee: Employee(
+              id: 'EMP_API', // APIから取得できないため仮のID
+              name: response.userName,
             ),
           ),
-        );
-      } else if (response.status == 'ready_to_out') {
-        // 退勤処理へ遷移
-        // プリセット交通費をList<int>に変換
-        final presetFares = response.transportPresets?.map((preset) {
-          return preset.amount;
-        }).toList() ?? <int>[];
+        ),
+      );
+    } else if (response.status == 'ready_to_out') {
+      // 退勤処理へ遷移
+      // プリセット交通費をList<int>に変換
+      final presetFares = response.transportPresets?.map((preset) {
+        return preset.amount;
+      }).toList() ?? <int>[];
 
-        final employeeData = EmployeeData(
-          name: response.userName,
-          clockInTime: clockInTime ?? DateTime.now(),
-          presetFares: presetFares,
-        );
-        
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DepartureScreen(
-              employeeData: employeeData,
-            ),
-          ),
-        );
-      }
-    } on DioException catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      final employeeData = EmployeeData(
+        name: response.userName,
+        clockInTime: clockInTime ?? DateTime.now(),
+        presetFares: presetFares,
+      );
 
-      if (e.response?.statusCode == 404) {
-        // カード未登録の場合、カード登録画面へ遷移
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CardRegistratePage(
-              cardId: scannedCardId,
-            ),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DepartureScreen(
+            employeeData: employeeData,
           ),
-        );
-      } else {
-        // その他のエラー
-        setState(() {
-          _errorMessage = 'エラーが発生しました: ${e.message}';
-        });
-      }
-    } catch (e) {
+        ),
+      );
+    } else {
+      // 予期しないステータス
       setState(() {
-        _isLoading = false;
-        _errorMessage = '予期しないエラーが発生しました: $e';
+        _errorMessage = 'APIから予期しないステータスが返されました: ${response.status}';
       });
     }
+
+  } on DioException catch (e) { // Dio固有のエラーをここで捕捉
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (e.response?.statusCode == 404) {
+      // 404: カード未登録の場合、カード登録画面へ遷移
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardRegistratePage(
+            cardId: scannedCardId,
+          ),
+        ),
+      );
+    } else {
+      // その他の Dio エラー (接続エラー、タイムアウト、その他のステータスコードなど)
+      setState(() {
+        _errorMessage = 'APIエラーが発生しました: ${e.message} (ステータスコード: ${e.response?.statusCode})';
+      });
+    }
+
+  } catch (e) { // その他の予期しないエラーをここで捕捉
+    setState(() {
+      _isLoading = false;
+      _errorMessage = '予期しないエラーが発生しました: $e';
+    });
   }
+}
 
   // リーダータイプを変更
   void _changeReaderType(CardReaderType? newType) {
