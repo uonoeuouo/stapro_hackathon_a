@@ -8,6 +8,7 @@ import 'attendance_page.dart';
 import 'departure_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'classroom_selection_page.dart';
+import 'card_registrate_page.dart';
 
 class ScanPage extends StatefulWidget {
   final ScanService scanService;
@@ -264,6 +265,22 @@ class _ScanPageState extends State<ScanPage> {
         }
       }
 
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+         if (!mounted) return;
+         Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CardRegistratePage(
+              cardId: cardId,
+            ),
+          ),
+        );
+      } else {
+         setState(() {
+          _message = 'API Error: ${e.message} (Status: ${e.statusCode})';
+        });
+      }
     } catch (e) {
       setState(() {
         _message = 'エラー: $e';
