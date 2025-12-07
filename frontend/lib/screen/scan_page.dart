@@ -8,6 +8,7 @@ import 'attendance_page.dart';
 import 'departure_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'classroom_selection_page.dart';
+import 'card_registrate_page.dart';
 
 class ScanPage extends StatefulWidget {
   final ScanService scanService;
@@ -49,7 +50,7 @@ class _ScanPageState extends State<ScanPage> {
   void dispose() {
     if (Platform.isIOS || Platform.isAndroid) {
       NfcManager.instance.stopSession();
-    } else if (Platform.isWindows || Platform.isMacOS) {
+    } else if (Platform.isWindows) {
       _pcscContext?.release();
     }
     super.dispose();
@@ -99,7 +100,7 @@ class _ScanPageState extends State<ScanPage> {
             }
           );
         }
-      } else if (Platform.isWindows || Platform.isMacOS) {
+      } else if (Platform.isWindows) {
         // --- Windows (dart_pcsc) ---
         try {
           _pcscContext = pcsc.Context(pcsc.Scope.user);
@@ -109,7 +110,7 @@ class _ScanPageState extends State<ScanPage> {
             _nfcAvailable = true;
             _nfcStatus = 'NFC Ready (PCSC)';
           });
-          _pollPcscDesktop();
+          _pollPcscWindows();
         } catch (e) {
           setState(() {
             _nfcAvailable = false;
@@ -124,7 +125,7 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
-  Future<void> _pollPcscDesktop() async {
+  Future<void> _pollPcscWindows() async {
     while (mounted && _pcscContext != null) {
       try {
         List<String> readers = await _pcscContext!.listReaders();
@@ -264,6 +265,22 @@ class _ScanPageState extends State<ScanPage> {
         }
       }
 
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+         if (!mounted) return;
+         Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CardRegistratePage(
+              cardId: cardId,
+            ),
+          ),
+        );
+      } else {
+         setState(() {
+          _message = 'API Error: ${e.message} (Status: ${e.statusCode})';
+        });
+      }
     } catch (e) {
       setState(() {
         _message = 'エラー: $e';

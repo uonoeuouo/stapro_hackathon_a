@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screen/classroom_selection_page.dart';
 import 'screen/scan_page.dart';
 import 'services/scan_service.dart';
-import 'services/mock_scan_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +19,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // インスタンスを作成
+    final scanService = RealScanService();
+
     return MaterialApp(
       title: 'Stapro Hackathon A',
       theme: ThemeData(
@@ -27,7 +29,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: initialClassroom != null
-          ? ScanPage(scanService: MockScanService())
+          ? ScanPage(scanService: scanService)
           : const ClassroomSelectionPage(),
     );
   }

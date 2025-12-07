@@ -6,11 +6,26 @@ abstract class ScanService {
   Future<Map<String, dynamic>> scanCard(String cardId);
 }
 
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  ApiException(this.statusCode, this.message);
+
+  @override
+  String toString() => 'ApiException(statusCode: $statusCode, message: $message)';
+}
+
 /// Real implementation using the backend API
 class RealScanService implements ScanService {
   final String baseUrl;
 
-  RealScanService({this.baseUrl = 'http://127.0.0.1:8000'});
+  RealScanService({String? baseUrl}) 
+      : baseUrl = baseUrl ?? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000') {
+    print('RealScanService initialized.');
+    print('Platform.isAndroid: ${Platform.isAndroid}');
+    print('Base URL: ${this.baseUrl}');
+  }
 
   @override
   Future<Map<String, dynamic>> scanCard(String cardId) async {
@@ -26,7 +41,7 @@ class RealScanService implements ScanService {
       if (response.statusCode == 200) {
         return jsonDecode(responseBody);
       } else {
-        throw Exception('Server returned ${response.statusCode}: $responseBody');
+        throw ApiException(response.statusCode, responseBody);
       }
     } finally {
       client.close();

@@ -66,7 +66,7 @@ class _AttendancePageState extends State<AttendancePage> {
             ),
             const SizedBox(height: 10),
             const Text(
-              '出勤しました！',
+              '出勤しますか？',
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -82,11 +82,6 @@ class _AttendancePageState extends State<AttendancePage> {
             Text(
               '$_timeoutSeconds秒後に自動的にホーム画面に戻ります...',
               style: const TextStyle(fontSize: 14, color: Colors.blueAccent),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: widget.onConfirm,
-              child: const Text('ホームへ戻る'),
             ),
           ],
         ),
