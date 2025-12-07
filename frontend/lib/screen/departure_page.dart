@@ -1,3 +1,4 @@
+import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
@@ -93,7 +94,9 @@ class _DeparturePageState extends State<DeparturePage> {
       if (!mounted) return;
       // After successful clock-out, go to confirmation screen
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (ctx) => ConfirmationScreen(fare: _selectedTransportCost)),
+        MaterialPageRoute(
+          builder: (ctx) => ConfirmationScreen(fare: _selectedTransportCost),
+        ),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -103,7 +106,10 @@ class _DeparturePageState extends State<DeparturePage> {
           title: const Text('退勤エラー'),
           content: Text('退勤に失敗しました: ${e.message}'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
           ],
         ),
       );
@@ -115,7 +121,10 @@ class _DeparturePageState extends State<DeparturePage> {
           title: const Text('通信エラー'),
           content: Text('退勤処理中にエラーが発生しました: $e'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
           ],
         ),
       );
@@ -146,7 +155,9 @@ class _DeparturePageState extends State<DeparturePage> {
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (ctx) => ConfirmationScreen(fare: _selectedTransportCost)),
+        MaterialPageRoute(
+          builder: (ctx) => ConfirmationScreen(fare: _selectedTransportCost),
+        ),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -157,7 +168,10 @@ class _DeparturePageState extends State<DeparturePage> {
           title: const Text('自動退勤エラー'),
           content: Text('自動退勤に失敗しました: ${e.message}'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
           ],
         ),
       );
@@ -169,7 +183,10 @@ class _DeparturePageState extends State<DeparturePage> {
           title: const Text('通信エラー'),
           content: Text('自動退勤処理中にエラーが発生しました: $e'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
           ],
         ),
       );
@@ -193,68 +210,168 @@ class _DeparturePageState extends State<DeparturePage> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.exit_to_app, size: 80, color: Colors.orange),
-              const SizedBox(height: 24),
-              Text('${widget.userName}さん', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('退勤時間: ${timeFormat.format(widget.clockOutTime)}', style: const TextStyle(fontSize: 20)),
-              const SizedBox(height: 24),
-
-              // Transport presets (radio buttons)
-              Align(alignment: Alignment.centerLeft, child: const Text('交通費プリセット', style: TextStyle(color: Colors.grey))),
-              const SizedBox(height: 8),
-              Column(
-                children: _buildTransportPresetRadios(),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Class count selector (checkboxes 1〜5). Default: auto-check first N boxes.
-              Align(alignment: Alignment.centerLeft, child: const Text('出勤コマ数', style: TextStyle(color: Colors.grey))),
-              const SizedBox(height: 8),
-              Column(
-                children: List<Widget>.generate(5, (index) {
-                  final label = '${index + 1} コマ';
-                  return CheckboxListTile(
-                    title: Text(label),
-                    value: _classChecks[index],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() {
-                        _classChecks[index] = v;
-                        _selectedClassCount = _classChecks.where((e) => e).length;
-                      });
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  );
-                }),
-              ),
-
-              const SizedBox(height: 32),
-              // Auto clock-out notice
-              Text('$_remainingSeconds 秒後に自動で退勤処理が行われます。', style: const TextStyle(fontSize: 14, color: Colors.grey)),
-              const SizedBox(height: 12),
-
-              ElevatedButton(
-                onPressed: _isLoading ? null : _confirmAndClockOut,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+          padding: const EdgeInsets.all(24.0),
+          child: FadeInUp(
+            duration: const Duration(milliseconds: 600),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.exit_to_app_rounded,
+                  size: 80,
+                  color: Colors.orange,
                 ),
-                child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('退勤する', style: TextStyle(fontSize: 20, color: Colors.white)),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('キャンセル'),
-              ),
-            ],
+                const SizedBox(height: 24),
+                Text(
+                  '${widget.userName}さん',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '退勤時間: ${timeFormat.format(widget.clockOutTime)}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 32),
+
+                // Transport presets (radio buttons)
+                Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.train_rounded,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '交通費プリセット',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Column(children: _buildTransportPresetRadios()),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Class count selector (checkboxes 1〜5)
+                Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.class_rounded,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '出勤コマ数',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Column(
+                          children: List<Widget>.generate(5, (index) {
+                            final label = '${index + 1} コマ';
+                            return CheckboxListTile(
+                              title: Text(label),
+                              value: _classChecks[index],
+                              activeColor: Theme.of(context).primaryColor,
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setState(() {
+                                  _classChecks[index] = v;
+                                  _selectedClassCount = _classChecks
+                                      .where((e) => e)
+                                      .length;
+                                });
+                              },
+                              controlAffinity: ListTileControlAffinity.leading,
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+                // Auto clock-out notice
+                Text(
+                  '$_remainingSeconds 秒後に自動で退勤処理が行われます。',
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _confirmAndClockOut,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            '退勤する',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('キャンセル'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -271,6 +388,7 @@ class _DeparturePageState extends State<DeparturePage> {
           title: Text('${widget.defaultCost} 円 (デフォルト)'),
           value: widget.defaultCost,
           groupValue: _selectedTransportCost,
+          activeColor: Theme.of(context).primaryColor,
           onChanged: (v) {
             if (v == null) return;
             setState(() => _selectedTransportCost = v);
@@ -286,7 +404,9 @@ class _DeparturePageState extends State<DeparturePage> {
       int cost = 0;
       try {
         if (p is Map && p.containsKey('cost')) {
-          cost = (p['cost'] is int) ? p['cost'] as int : int.tryParse('${p['cost']}') ?? 0;
+          cost = (p['cost'] is int)
+              ? p['cost'] as int
+              : int.tryParse('${p['cost']}') ?? 0;
         }
         if (p is Map && p.containsKey('name')) {
           label = '${p['name']} — ${cost} 円';
@@ -297,28 +417,39 @@ class _DeparturePageState extends State<DeparturePage> {
         label = '${cost} 円';
       }
 
-      rows.add(RadioListTile<int>(
-        title: Text(label),
-        value: cost,
-        groupValue: _selectedTransportCost,
-        onChanged: (v) {
-          if (v == null) return;
-          setState(() => _selectedTransportCost = v);
-        },
-      ));
+      rows.add(
+        RadioListTile<int>(
+          title: Text(label),
+          value: cost,
+          groupValue: _selectedTransportCost,
+          activeColor: Theme.of(context).primaryColor,
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _selectedTransportCost = v);
+          },
+        ),
+      );
     }
 
     // Also include an explicit custom/default option
-    if (!presets.any((p) => (p is Map && ((p['cost'] == widget.defaultCost) || (int.tryParse('${p['cost']}') == widget.defaultCost))))) {
-      rows.add(RadioListTile<int>(
-        title: Text('${widget.defaultCost} 円 (デフォルト)'),
-        value: widget.defaultCost,
-        groupValue: _selectedTransportCost,
-        onChanged: (v) {
-          if (v == null) return;
-          setState(() => _selectedTransportCost = v);
-        },
-      ));
+    if (!presets.any(
+      (p) =>
+          (p is Map &&
+          ((p['cost'] == widget.defaultCost) ||
+              (int.tryParse('${p['cost']}') == widget.defaultCost))),
+    )) {
+      rows.add(
+        RadioListTile<int>(
+          title: Text('${widget.defaultCost} 円 (デフォルト)'),
+          value: widget.defaultCost,
+          groupValue: _selectedTransportCost,
+          activeColor: Theme.of(context).primaryColor,
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _selectedTransportCost = v);
+          },
+        ),
+      );
     }
 
     return rows;

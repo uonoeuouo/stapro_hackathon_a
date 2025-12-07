@@ -1,3 +1,4 @@
+import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart'; // MyAppをインポート
@@ -5,7 +6,7 @@ import 'dart:async';
 
 class ConfirmationScreen extends StatefulWidget {
   final int fare;
-  final int timeoutSeconds = 5;
+  final int timeoutSeconds = 3; // Changed to 3 seconds
 
   const ConfirmationScreen({super.key, required this.fare});
 
@@ -19,7 +20,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   @override
   void initState() {
     super.initState();
-    // 5秒後に自動遷移するタイマーを開始
+    // 3秒後に自動遷移するタイマーを開始
     _startTimeoutTimer();
   }
 
@@ -44,8 +45,9 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     // Navigator.popAll を使って、ルート（ホーム画面）以外のすべての画面を閉じる
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-          // 取得した savedClassroom を渡す
-          builder: (context) => MyApp(initialClassroom: savedClassroom)),
+        // 取得した savedClassroom を渡す
+        builder: (context) => MyApp(initialClassroom: savedClassroom),
+      ),
       (Route<dynamic> route) => false, // すべてのルートを削除
     );
   }
@@ -53,31 +55,78 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('退勤確認')),
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Icon(Icons.celebration, color: Colors.amber, size: 80),
-            const SizedBox(height: 20),
-            const Text(
-              '退勤処理が完了しました！',
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+            ZoomIn(
+              duration: const Duration(milliseconds: 500),
+              child: Container(
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.celebration_rounded,
+                  color: Colors.orange,
+                  size: 100,
+                ),
+              ),
             ),
-            const SizedBox(height: 20),
-            Text(
-              '登録交通費: ${widget.fare}円',
-              style: const TextStyle(fontSize: 24, color: Colors.green),
+            const SizedBox(height: 32),
+            FadeInUp(
+              child: Text(
+                '退勤しました',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ),
-            Text(
-              '${widget.timeoutSeconds}秒後に自動的にホーム画面に戻ります...',
-              style: const TextStyle(fontSize: 14, color: Colors.blueAccent),
+            const SizedBox(height: 16),
+            FadeInUp(
+              delay: const Duration(milliseconds: 200),
+              child: Text(
+                'お疲れ様でした！',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: Colors.grey[700]),
+              ),
             ),
-            const SizedBox(height: 40),
-            // 緊急でホームに戻るためのボタン（任意）
-            ElevatedButton(
-              onPressed: _navigateToHome,
-              child: const Text('今すぐホーム画面に戻る'),
+            const SizedBox(height: 32),
+            FadeInUp(
+              delay: const Duration(milliseconds: 400),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '登録交通費: ${widget.fare}円',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 48),
+            FadeIn(
+              delay: const Duration(milliseconds: 1000),
+              child: Text(
+                'ホーム画面に戻ります...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
             ),
           ],
         ),

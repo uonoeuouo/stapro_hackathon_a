@@ -40,6 +40,8 @@ dependencies:
   nfc_manager: ^4.1.1
   dart_pcsc: ^2.0.2
   shared_preferences: ^2.5.3
+  google_fonts: ^6.3.3
+  animate_do: ^4.2.0
 
 dev_dependencies:
   flutter_test:
