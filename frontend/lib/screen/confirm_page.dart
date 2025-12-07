@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart'; // MyAppをインポート
 import 'dart:async';
 
@@ -35,12 +36,16 @@ class _ConfirmationScreenState extends State<ConfirmationScreen> {
     });
   }
 
-  void _navigateToHome() {
+  Future<void> _navigateToHome() async {
+    // SharedPreferencesから保存された教室名を取得
+    final prefs = await SharedPreferences.getInstance();
+    final savedClassroom = prefs.getString('selected_classroom');
+    if (!mounted) return;
     // Navigator.popAll を使って、ルート（ホーム画面）以外のすべての画面を閉じる
-    // 今回は main.dart の MyApp() がルートだと仮定して、そこに戻ります。
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-          builder: (context) => const MyApp()), // MyApp はホーム画面のウィジェットに置き換えてください
+          // 取得した savedClassroom を渡す
+          builder: (context) => MyApp(initialClassroom: savedClassroom)),
       (Route<dynamic> route) => false, // すべてのルートを削除
     );
   }
