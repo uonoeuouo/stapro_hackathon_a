@@ -104,8 +104,8 @@ class _ScanPageState extends State<ScanPage> {
             },
           );
         }
-      } else if (Platform.isWindows) {
-        // --- Windows (dart_pcsc) ---
+      } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+        // --- Desktop (dart_pcsc) ---
         try {
           _pcscContext = pcsc.Context(pcsc.Scope.user);
           await _pcscContext!.establish();
@@ -114,7 +114,7 @@ class _ScanPageState extends State<ScanPage> {
             _nfcAvailable = true;
             _nfcStatus = 'NFC Ready (PCSC)';
           });
-          _pollPcscWindows();
+          _pollPcscDesktop();
         } catch (e) {
           setState(() {
             _nfcAvailable = false;
@@ -129,7 +129,7 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
-  Future<void> _pollPcscWindows() async {
+  Future<void> _pollPcscDesktop() async {
     while (mounted && _pcscContext != null) {
       try {
         List<String> readers = await _pcscContext!.listReaders();
