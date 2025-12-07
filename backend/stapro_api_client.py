@@ -94,7 +94,7 @@ class StaproAPIClient:
         # others use `/api/v1/auth/login` (direct API). Try both and return the first success.
         payload = {'email': email, 'password': password}
         last_exc = None
-        for endpoint in ['/auth/login', '/api/v1/auth/login']:
+        for endpoint in ['/api/v1/auth/login', '/auth/login']:
             try:
                 return self._post(endpoint, payload)
             except requests.exceptions.HTTPError as e:
