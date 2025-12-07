@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../widgets/glass_container.dart';
+import '../widgets/gradient_scaffold.dart';
 
 class AttendancePage extends StatelessWidget {
   final String userName;
@@ -12,45 +14,60 @@ class AttendancePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('出勤確認'),
-        automaticallyImplyLeading: false,
-      ),
+    return GradientScaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Icon(
-              Icons.check_circle_outline,
-              color: Colors.green,
-              size: 100,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'おはようございます、\n$userNameさん！',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              '出勤しますか？',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: onConfirm,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: GlassContainer(
+              padding: 32,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(
+                    Icons.wb_sunny_rounded,
+                    color: Colors.orange, // Orange for sun
+                    size: 80,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Good Morning,\n$userName!',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 28, 
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1565C0), // Dark Blue
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Start your shift?',
+                    style: TextStyle(
+                      fontSize: 18, 
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: onConfirm,
+                      style: ElevatedButton.styleFrom(
+                         backgroundColor: const Color(0xFF00BFA6), // Teal for start
+                      ),
+                      child: const Text('CLOCK IN', style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                   const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false), // Cancel
+                    child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+                  ),
+                ],
               ),
-              child: const Text('出勤する', style: TextStyle(fontSize: 24)),
             ),
-             const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.pop(context, false), // Cancel
-              child: const Text('キャンセル', style: TextStyle(fontSize: 18, color: Colors.grey)),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -9,6 +9,8 @@ import 'departure_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'classroom_selection_page.dart';
 import 'card_registrate_page.dart';
+import '../widgets/glass_container.dart';
+import '../widgets/gradient_scaffold.dart';
 
 class ScanPage extends StatefulWidget {
   final ScanService scanService;
@@ -302,105 +304,111 @@ class _ScanPageState extends State<ScanPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-
-
+    return GradientScaffold(
       appBar: AppBar(
-        title: const Text('Attendance Scanner'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: '教室を変更',
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('selected_classroom');
-
-              if (context.mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => const ClassroomSelectionPage(),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
+        title: const Text('ATTENDANCE SCANNER'),
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Status Indicator
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: _isClockedIn ? Colors.green.shade100 : Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: _isClockedIn ? Colors.green : Colors.grey),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_isClockedIn ? Icons.work : Icons.home, color: _isClockedIn ? Colors.green : Colors.grey),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isClockedIn ? '勤務中 ($_currentUserName)' : '待機中',
-                      style: TextStyle(
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold,
-                        color: _isClockedIn ? Colors.green.shade800 : Colors.grey.shade800
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Status Indicator using Glass Container
+                GlassContainer(
+                  color: _isClockedIn ? Colors.greenAccent.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+                  borderRadius: 30,
+                  padding: 12,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isClockedIn ? Icons.check_circle : Icons.timer,
+                        color: _isClockedIn ? Colors.greenAccent : Colors.white,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Text(
+                        _isClockedIn ? 'WORKING: $_currentUserName' : 'STANDBY',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          color: _isClockedIn ? Colors.greenAccent : Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text(_nfcStatus, style: TextStyle(color: _nfcAvailable ? Colors.blue : Colors.red)),
-              const SizedBox(height: 48),
-              
-              Text(
-                _message,
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              
-              // Input for Card ID (Simulating NFC)
-              TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Scan Card (or type ID)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Waiting for card...',
-                  suffixIcon: Icon(Icons.nfc),
+                const SizedBox(height: 20),
+                Text(
+                  _nfcStatus,
+                  style: TextStyle(
+                    color: _nfcAvailable ? Colors.cyanAccent : Colors.redAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                onSubmitted: _handleScan,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Mock NFC Button
-              ElevatedButton.icon(
-                onPressed: () => _handleScan("mock_card_123"),
-                icon: const Icon(Icons.nfc),
-                label: const Text("【Mock】NFCタッチをシミュレート"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple.shade50,
-                  foregroundColor: Colors.deepPurple,
-                ),
-              ),
+                const SizedBox(height: 48),
 
-              if (_isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 16.0),
-                  child: CircularProgressIndicator(),
+                // Hero Message
+                Text(
+                  _message,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white, // White text stands out better on vivid background
+                    shadows: [
+                      Shadow(blurRadius: 10, color: Colors.blueAccent.withOpacity(0.5), offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-            ],
+                const SizedBox(height: 60),
+
+                // Removed NFC Visual as per request
+                // Instead, just a simple hint or spacing
+                const Icon(Icons.arrow_downward, color: Colors.white54, size: 32),
+                
+                const SizedBox(height: 60),
+                
+                const SizedBox(height: 48),
+
+                // Functionality Area (Glass)
+                GlassContainer(
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        style: const TextStyle(color: Colors.black87), // Black text for white glass
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Scan Card / Enter ID',
+                          labelStyle: TextStyle(color: Colors.black54),
+                          border: InputBorder.none,
+                          hintText: 'Waiting for scan...',
+                          hintStyle: TextStyle(color: Colors.black26),
+                          prefixIcon: Icon(Icons.credit_card, color: Colors.black45),
+                        ),
+                        onSubmitted: _handleScan,
+                      ),
+                      const Divider(color: Colors.white24),
+                      TextButton.icon(
+                        onPressed: () => _handleScan("mock_card_123"),
+                        icon: const Icon(Icons.touch_app, color: Colors.white),
+                        label: const Text("SIMULATE TOUCH (DEBUG)", style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 24.0),
+                    child: CircularProgressIndicator(),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
