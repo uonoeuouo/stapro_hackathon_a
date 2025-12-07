@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:io';
 
 class CardRegistratePage extends StatefulWidget {
   final String cardId; // スキャンされたカードID
@@ -17,6 +19,7 @@ class _CardRegistratePageState extends State<CardRegistratePage> {
   final TextEditingController _mailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -25,33 +28,90 @@ class _CardRegistratePageState extends State<CardRegistratePage> {
     super.dispose();
   }
 
-  void _registerCard() {
-    if (_formKey.currentState!.validate()) {
-      // カード登録処理(バックエンドAPIへ送信)
-      print('カードID: ${widget.cardId}');
-      print('メールアドレス: ${_mailController.text}');
-      print('パスワード: ${_passwordController.text}');
+  Future<void> _registerCard() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      // TODO: バックエンドAPIへPOSTリクエストを送信
-      // 登録成功後、適切な画面へ遷移
-      
-      // 登録完了のダイアログを表示
+    setState(() {
+      _isLoading = true;
+    });
+
+    final email = _mailController.text.trim();
+    final password = _passwordController.text;
+
+    // baseUrl は Android エミュレータ向けにローカルを特別扱い
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
+
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/register-card');
+      final request = await client.postUrl(uri);
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      final body = jsonEncode({
+        'card_id': widget.cardId,
+        'stapro_email': email,
+        'stapro_password': password,
+      });
+      request.add(utf8.encode(body));
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('登録完了'),
+            content: const Text('カードの登録が完了しました。'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // ダイアログを閉じる
+                  Navigator.of(context).pop(); // カード登録画面を閉じる
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('登録エラー'),
+            content: Text('登録に失敗しました。(${response.statusCode})\n$responseBody'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('登録完了'),
-          content: const Text('カードの登録が完了しました。'),
+          title: const Text('通信エラー'),
+          content: Text('サーバーに接続できませんでした: $e'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // ダイアログを閉じる
-                Navigator.of(context).pop(); // カード登録画面を閉じる
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('OK'),
             ),
           ],
         ),
       );
+    } finally {
+      client.close(force: true);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -188,7 +248,7 @@ class _CardRegistratePageState extends State<CardRegistratePage> {
                 SizedBox(
                   height: 60,
                   child: ElevatedButton(
-                    onPressed: _registerCard,
+                    onPressed: _isLoading ? null : _registerCard,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
                       textStyle: const TextStyle(fontSize: 20),
@@ -202,6 +262,14 @@ class _CardRegistratePageState extends State<CardRegistratePage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                if (_isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 8.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
               ],
             ),
           ),
