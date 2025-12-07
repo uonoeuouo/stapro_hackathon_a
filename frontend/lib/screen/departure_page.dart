@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import '../services/scan_service.dart';
 import 'confirm_page.dart';
@@ -32,7 +33,10 @@ class DeparturePage extends StatefulWidget {
 }
 
 class _DeparturePageState extends State<DeparturePage> {
+  Timer? _autoClockOutTimer;
+  bool _hasSubmitted = false;
   late int _selectedTransportCost;
+  int _remainingSeconds = 10;
   late int _selectedClassCount;
   late List<bool> _classChecks; // index 0 => 1コマ
   bool _isLoading = false;
@@ -48,9 +52,32 @@ class _DeparturePageState extends State<DeparturePage> {
       _classChecks[i] = true;
     }
     _selectedClassCount = _classChecks.where((v) => v).length;
+    // start auto clock-out timer (10 seconds)
+    // countdown timer for UI + auto trigger
+    _autoClockOutTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      setState(() {
+        _remainingSeconds = (_remainingSeconds - 1).clamp(0, 10);
+      });
+      if (_remainingSeconds <= 0) {
+        t.cancel();
+        _handleAutoClockOut();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoClockOutTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _confirmAndClockOut() async {
+    // If auto-submit already triggered, do nothing
+    if (_hasSubmitted) return;
+    _autoClockOutTimer?.cancel();
+    _autoClockOutTimer = null;
+    _hasSubmitted = true;
+
     setState(() {
       _isLoading = true;
     });
@@ -87,6 +114,60 @@ class _DeparturePageState extends State<DeparturePage> {
         builder: (context) => AlertDialog(
           title: const Text('通信エラー'),
           content: Text('退勤処理中にエラーが発生しました: $e'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleAutoClockOut() async {
+    if (_hasSubmitted) return;
+    _hasSubmitted = true;
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await widget.scanService.clockOut(
+        widget.cardId,
+        _selectedTransportCost,
+        _selectedClassCount,
+        isAutoSubmit: true,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (ctx) => ConfirmationScreen(fare: _selectedTransportCost)),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // show an error dialog but don't auto-retry here
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('自動退勤エラー'),
+          content: Text('自動退勤に失敗しました: ${e.message}'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('通信エラー'),
+          content: Text('自動退勤処理中にエラーが発生しました: $e'),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
           ],
@@ -156,6 +237,9 @@ class _DeparturePageState extends State<DeparturePage> {
               ),
 
               const SizedBox(height: 32),
+              // Auto clock-out notice
+              Text('$_remainingSeconds 秒後に自動で退勤処理が行われます。', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+              const SizedBox(height: 12),
 
               ElevatedButton(
                 onPressed: _isLoading ? null : _confirmAndClockOut,
