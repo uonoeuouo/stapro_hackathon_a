@@ -214,12 +214,33 @@ class _ScanPageState extends State<ScanPage> {
         );
 
         if (result == true) {
-          setState(() {
-            _isClockedIn = true;
-            _clockInTime = DateTime.now();
-            _currentUserName = userName;
-            _message = '出勤しました: $userName\n出勤時間: ${_formatTime(_clockInTime!)}';
-          });
+          try {
+            final clockInResp = await widget.scanService.clockIn(cardId);
+            DateTime clockInAt;
+            try {
+              clockInAt = DateTime.parse(clockInResp['clock_in_at']);
+            } catch (_) {
+              clockInAt = DateTime.now();
+            }
+
+            if (!mounted) return;
+            setState(() {
+              _isClockedIn = true;
+              _clockInTime = clockInAt;
+              _currentUserName = userName;
+              _message = '出勤しました: $userName\n出勤時間: ${_formatTime(_clockInTime!)}';
+            });
+          } on ApiException catch (e) {
+            if (!mounted) return;
+            setState(() {
+              _message = '出勤APIエラー: ${e.message}';
+            });
+          } catch (e) {
+            if (!mounted) return;
+            setState(() {
+              _message = '出勤処理でエラーが発生しました: $e';
+            });
+          }
         } else {
            setState(() {
             _message = 'キャンセルされました';

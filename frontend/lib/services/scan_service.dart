@@ -4,6 +4,7 @@ import 'dart:io';
 /// Abstract interface for the scanning service
 abstract class ScanService {
   Future<Map<String, dynamic>> scanCard(String cardId);
+  Future<Map<String, dynamic>> clockIn(String cardId);
 }
 
 class ApiException implements Exception {
@@ -38,6 +39,27 @@ class RealScanService implements ScanService {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
       
+      if (response.statusCode == 200) {
+        return jsonDecode(responseBody);
+      } else {
+        throw ApiException(response.statusCode, responseBody);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> clockIn(String cardId) async {
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(Uri.parse('$baseUrl/api/clock-in'));
+      request.headers.set(HttpHeaders.contentTypeHeader, "application/json");
+      request.add(utf8.encode(jsonEncode({'card_id': cardId})));
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
       if (response.statusCode == 200) {
         return jsonDecode(responseBody);
       } else {
