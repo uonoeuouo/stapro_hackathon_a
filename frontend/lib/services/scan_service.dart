@@ -61,7 +61,7 @@ class RealScanService implements ScanService {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.statusCode == 200) {
         return jsonDecode(responseBody);
       } else {
         throw ApiException(response.statusCode, responseBody);
@@ -70,6 +70,7 @@ class RealScanService implements ScanService {
       client.close();
     }
   }
+
 
   @override
   Future<Map<String, dynamic>> clockOut(String cardId, int transportCost, int classCount, {bool isAutoSubmit = false, List<int>? lessonIds}) async {
