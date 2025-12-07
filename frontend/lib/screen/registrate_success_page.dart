@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async'; // Timerを使うために必要
 
-// 適切なホーム画面ウィジェットをインポートしてください
-import 'departure_page.dart';
+import 'scan_page.dart';
+import '../services/scan_service.dart';
 import '../data/employee.dart';
-
 class RegistrationSuccessScreen extends StatefulWidget {
   final String registeredName;
   final int registeredFare;
@@ -35,26 +34,19 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen> {
 
   void _startTimeoutTimer() {
     _timer = Timer(Duration(seconds: _timeoutSeconds), () {
-      _navigateToDepartureScreen();
+      _navigateToScanPage();
     });
   }
 
-  void _navigateToDepartureScreen() {
-    // Navigator.pushAndRemoveUntil を使用して、DepartureScreen に戻る
-    
+  void _navigateToScanPage() {
+    // 登録完了後はスキャン画面（ホーム）へ戻す
     Navigator.of(context).pushAndRemoveUntil(
-      // 1. 遷移先のウィジェットを DepartureScreen に変更
       MaterialPageRoute(
-        // DepartureScreen が必要とする引数を再提供してください。
-        // 例: 遷移元から渡された widget.employeeData を再利用
-        builder: (context) => DepartureScreen(
-          employeeData: widget.employeeData, 
-        ),
+        builder: (context) => ScanPage(scanService: RealScanService()),
       ),
-      // 2. すべてのルートを削除し、DepartureScreen をトップにする
-      (Route<dynamic> route) => false, 
+      (Route<dynamic> route) => false,
     );
-}
+  }
 
   @override
   void dispose() {
