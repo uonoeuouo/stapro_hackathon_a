@@ -5,6 +5,7 @@ import 'dart:io';
 abstract class ScanService {
   Future<Map<String, dynamic>> scanCard(String cardId);
   Future<Map<String, dynamic>> clockIn(String cardId);
+  Future<Map<String, dynamic>> clockOut(String cardId, int transportCost, int classCount, {bool isAutoSubmit = false, List<int>? lessonIds});
 }
 
 class ApiException implements Exception {
@@ -61,6 +62,35 @@ class RealScanService implements ScanService {
       final responseBody = await response.transform(utf8.decoder).join();
 
       if (response.statusCode == 200) {
+        return jsonDecode(responseBody);
+      } else {
+        throw ApiException(response.statusCode, responseBody);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+
+  @override
+  Future<Map<String, dynamic>> clockOut(String cardId, int transportCost, int classCount, {bool isAutoSubmit = false, List<int>? lessonIds}) async {
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(Uri.parse('$baseUrl/api/clock-out'));
+      request.headers.set(HttpHeaders.contentTypeHeader, "application/json");
+      final body = {
+        'card_id': cardId,
+        'transport_cost': transportCost,
+        'class_count': classCount,
+        'is_auto_submit': isAutoSubmit,
+      };
+      if (lessonIds != null) body['lesson_ids'] = lessonIds;
+      request.add(utf8.encode(jsonEncode(body)));
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return jsonDecode(responseBody);
       } else {
         throw ApiException(response.statusCode, responseBody);
