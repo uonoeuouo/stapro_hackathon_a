@@ -206,43 +206,39 @@ class _ScanPageState extends State<ScanPage> {
           MaterialPageRoute(
             builder: (context) => AttendancePage(
               userName: userName,
-              onConfirm: () {
-                Navigator.pop(context, true);
+              onConfirm: () async {
+                // When AttendancePage auto-confirms (after timer), perform clock-in here
+                try {
+                  final clockInResp = await widget.scanService.clockIn(cardId);
+                  try {
+                    return DateTime.parse(clockInResp['clock_in_at']);
+                  } catch (_) {
+                    return DateTime.now();
+                  }
+                } on ApiException catch (e) {
+                  // Return null to indicate failure/cancel
+                  if (mounted) setState(() { _message = '出勤APIエラー: ${e.message}'; });
+                  return null;
+                } catch (e) {
+                  if (mounted) setState(() { _message = '出勤処理でエラーが発生しました: $e'; });
+                  return null;
+                }
               },
             ),
           ),
         );
 
-        if (result == true) {
-          try {
-            final clockInResp = await widget.scanService.clockIn(cardId);
-            DateTime clockInAt;
-            try {
-              clockInAt = DateTime.parse(clockInResp['clock_in_at']);
-            } catch (_) {
-              clockInAt = DateTime.now();
-            }
-
-            if (!mounted) return;
-            setState(() {
-              _isClockedIn = true;
-              _clockInTime = clockInAt;
-              _currentUserName = userName;
-              _message = '出勤しました: $userName\n出勤時間: ${_formatTime(_clockInTime!)}';
-            });
-          } on ApiException catch (e) {
-            if (!mounted) return;
-            setState(() {
-              _message = '出勤APIエラー: ${e.message}';
-            });
-          } catch (e) {
-            if (!mounted) return;
-            setState(() {
-              _message = '出勤処理でエラーが発生しました: $e';
-            });
-          }
+        if (result is DateTime) {
+          if (!mounted) return;
+          setState(() {
+            _isClockedIn = true;
+            _clockInTime = result;
+            _currentUserName = userName;
+            _message = '出勤しました: $userName\n出勤時間: ${_formatTime(_clockInTime!)}';
+          });
         } else {
-           setState(() {
+          if (!mounted) return;
+          setState(() {
             _message = 'キャンセルされました';
           });
         }
