@@ -3,7 +3,7 @@ import 'dart:async';
 
 class AttendancePage extends StatefulWidget {
   final String userName;
-  final VoidCallback onConfirm;
+  final Future<DateTime?> Function() onConfirm;
 
   const AttendancePage({
     super.key,
@@ -26,8 +26,10 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   void _startTimeoutTimer() {
-    _timer = Timer(Duration(seconds: _timeoutSeconds), () {
-      widget.onConfirm();
+    _timer = Timer(Duration(seconds: _timeoutSeconds), () async {
+      final DateTime? dt = await widget.onConfirm();
+      // Return the datetime to the caller (ScanPage) as the result of Navigator.pop
+      if (mounted) Navigator.pop(context, dt);
     });
   }
 
