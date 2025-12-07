@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
-class AttendancePage extends StatelessWidget {
+class AttendancePage extends StatefulWidget {
   final String userName;
   final VoidCallback onConfirm;
 
@@ -11,10 +12,41 @@ class AttendancePage extends StatelessWidget {
   });
 
   @override
+  State<AttendancePage> createState() => _AttendancePageState();
+}
+
+class _AttendancePageState extends State<AttendancePage> {
+  Timer? _timer;
+  final int _timeoutSeconds = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimeoutTimer();
+  }
+
+  void _startTimeoutTimer() {
+    _timer = Timer(Duration(seconds: _timeoutSeconds), () {
+      widget.onConfirm();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    String dateStr = '${now.year}年${now.month}月${now.day}日';
+    String timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('出勤確認'),
+        title: const Text('出勤完了'),
         automaticallyImplyLeading: false,
       ),
       body: Center(
@@ -28,7 +60,7 @@ class AttendancePage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'おはようございます、\n$userNameさん！',
+              'おはようございます、\n${widget.userName}さん！',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
@@ -37,18 +69,19 @@ class AttendancePage extends StatelessWidget {
               '出勤しますか？',
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: onConfirm,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-              ),
-              child: const Text('出勤する', style: TextStyle(fontSize: 24)),
+            const SizedBox(height: 10),
+            Text(
+              dateStr,
+              style: const TextStyle(fontSize: 20, color: Colors.grey),
             ),
-             const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.pop(context, false), // Cancel
-              child: const Text('キャンセル', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            Text(
+              timeStr,
+              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 40),
+            Text(
+              '$_timeoutSeconds秒後に自動的にホーム画面に戻ります...',
+              style: const TextStyle(fontSize: 14, color: Colors.blueAccent),
             ),
           ],
         ),

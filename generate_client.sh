@@ -8,7 +8,7 @@ echo "Fetching OpenAPI spec from backend..."
 openapi-generator generate \
   -i http://127.0.0.1:8000/openapi.json \
   -g dart-dio \
-  -o ./frontend/lib/api \
+  -o ./frontend_api_client \
   --additional-properties=pubName=openapi
 
-echo "Done! API client generated in ./frontend/lib/api"
+echo "Done! API client generated in ./frontend_api_client"
