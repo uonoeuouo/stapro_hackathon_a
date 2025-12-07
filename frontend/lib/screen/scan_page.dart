@@ -244,6 +244,10 @@ class _ScanPageState extends State<ScanPage> {
               cardId: cardId,
               clockInTime: _clockInTime!,
               clockOutTime: now,
+              defaultCost: (data['default_cost'] is int) ? data['default_cost'] as int : (data['default_cost'] != null ? int.tryParse('${data['default_cost']}') ?? 0 : 0),
+              estimatedClassCount: (data['estimated_class_count'] is int) ? data['estimated_class_count'] as int : (data['estimated_class_count'] != null ? int.tryParse('${data['estimated_class_count']}') ?? 0 : 0),
+              transportPresets: data['transport_presets'] ?? [],
+              scanService: widget.scanService,
               onConfirm: () {
                 Navigator.pop(context, true);
               },

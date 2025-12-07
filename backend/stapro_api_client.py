@@ -49,11 +49,11 @@ class StaproAPIClient:
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            # Log payload and response body to help diagnose 4xx/5xx errors
+            # Log status at error level, but payload/response body at debug level
             try:
                 logging.error("Stapro API POST %s returned %s", endpoint, response.status_code)
-                logging.error("Request payload: %s", data)
-                logging.error("Response body: %s", response.text)
+                logging.debug("Request payload: %s", data)
+                logging.debug("Response body: %s", response.text)
             except Exception:
                 pass
             raise

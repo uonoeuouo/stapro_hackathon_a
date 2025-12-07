@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
+import requests
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from pydantic import BaseModel
@@ -319,6 +320,21 @@ def clock_in(req: ClockInRequest):
                     lesson_ids=[],
                 )
                 external_created = True
+            except requests.exceptions.HTTPError as e:
+                # If Stapro returns 422 for duplicate work_day, treat as already-created and continue
+                resp = getattr(e, 'response', None)
+                status = getattr(resp, 'status_code', None)
+                body = ''
+                try:
+                    body = resp.text if resp is not None else ''
+                except Exception:
+                    body = str(e)
+
+                if status == 422:
+                    print(f"Stapro create_attendance returned 422 on clock-in (possibly already exists): {body}")
+                    external_created = True
+                else:
+                    print(f"Stapro create_attendance failed on clock-in: {e}")
             except Exception as e:
                 print(f"Stapro create_attendance failed on clock-in: {e}")
         else:
@@ -387,6 +403,20 @@ def clock_out(req: ClockOutRequest):
                     lesson_ids=(req.lesson_ids or []),
                 )
                 external_created = True
+            except requests.exceptions.HTTPError as e:
+                resp = getattr(e, 'response', None)
+                status = getattr(resp, 'status_code', None)
+                body = ''
+                try:
+                    body = resp.text if resp is not None else ''
+                except Exception:
+                    body = str(e)
+
+                if status == 422:
+                    print(f"Stapro create_attendance returned 422 on clock-out (possibly already exists): {body}")
+                    external_created = True
+                else:
+                    print(f"Stapro create_attendance failed on clock-out: {e}")
             except Exception as e:
                 print(f"Stapro create_attendance failed on clock-out: {e}")
         else:
