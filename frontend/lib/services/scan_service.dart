@@ -1,4 +1,4 @@
-liimport 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 
 /// Abstract interface for the scanning service
